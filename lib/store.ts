@@ -11,6 +11,8 @@ export const store = {
   instagramUrl: 'https://www.instagram.com/recycledrecordslp/',
   phone: '720-291-7000',
   phoneHref: 'tel:+17202917000',
+  email: 'gale@recycledrecordslps.com',
+  emailHref: 'mailto:gale@recycledrecordslps.com',
   address: '6565 Gunpark Dr, Ste 190',
   locality: 'Boulder, CO 80301',
   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=6565+Gunpark+Dr+Suite+190+Boulder+CO+80301',
