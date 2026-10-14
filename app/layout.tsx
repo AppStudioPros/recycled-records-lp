@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Analytics } from '@vercel/analytics/react';
 import '@fontsource/fraunces/latin-700.css';
 import '@fontsource/fraunces/latin-800.css';
 import '@fontsource/dm-sans/latin-400.css';
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <PageTracker />
         {children}
+        <Analytics />
       </body>
     </html>
   );
