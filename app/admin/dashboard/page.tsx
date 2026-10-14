@@ -1,6 +1,8 @@
 import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import DashboardNav from './DashboardNav'
+import TrafficToggle from './TrafficToggle'
+import { Suspense } from 'react'
 import { FileText, Eye, BarChart2 } from 'lucide-react'
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -24,7 +26,15 @@ function ProgressBar({ pct, color = '#C4522A' }: { pct: number; color?: string }
   )
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>
+}) {
+  const params = await searchParams
+  const period = ['7', '30', '365'].includes(params.period ?? '') ? (params.period ?? '30') : '30'
+  const periodDays = parseInt(period)
+
   const profile = await requireAuth()
   const supabase = createAdminClient()
 
@@ -39,18 +49,18 @@ export default async function DashboardPage() {
   const draftCount = posts?.filter((p) => p.status === 'draft').length ?? 0
   const recentPosts = posts?.slice(0, 5) ?? []
 
-  // Traffic stats (last 30 days)
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  // Traffic stats — dynamic period
+  const periodStart = new Date()
+  periodStart.setDate(periodStart.getDate() - periodDays)
 
   const { data: allViews } = await supabase
     .from('rr_page_views')
-    .select('id, page, referrer_source, device_type, created_at')
+    .select('id')
 
   const { data: recentViews } = await supabase
     .from('rr_page_views')
     .select('id, page, referrer_source, device_type')
-    .gte('created_at', thirtyDaysAgo.toISOString())
+    .gte('created_at', periodStart.toISOString())
 
   const totalAllTime = allViews?.length ?? 0
   const totalLast30 = recentViews?.length ?? 0
@@ -145,12 +155,20 @@ export default async function DashboardPage() {
 
           {/* Traffic */}
           <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
-              <Eye className="w-4 h-4" /> Traffic (Last 30 Days)
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                <Eye className="w-4 h-4" /> Traffic
+              </h2>
+              <Suspense>
+                <TrafficToggle current={period} />
+              </Suspense>
+            </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <StatCard label="Visits (Last 30 Days)" value={totalLast30.toLocaleString()} />
+              <StatCard
+                label={`Visits (Last ${period === '365' ? '12 Months' : period + ' Days'})`}
+                value={totalLast30.toLocaleString()}
+              />
               <StatCard label="Total Visits (All Time)" value={totalAllTime.toLocaleString()} />
             </div>
 
