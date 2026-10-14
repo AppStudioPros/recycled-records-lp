@@ -33,7 +33,7 @@ export default function DashboardNav({
   }
 
   return (
-    <aside className="w-64 min-h-screen flex flex-col flex-shrink-0" style={{ background: '#1a0a00' }}>
+    <aside className="w-64 min-h-screen flex flex-col flex-shrink-0" style={{ background: '#3d1f0f' }}>
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
