@@ -19,7 +19,7 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex min-h-screen">
-      <DashboardNav email={profile.email} />
+      <DashboardNav email={profile.email} role={profile.role} />
       <main className="flex-1 p-8">
         <div className="max-w-5xl mx-auto">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Post</h1>

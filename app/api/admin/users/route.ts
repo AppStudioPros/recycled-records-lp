@@ -1,20 +1,51 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireAuth } from '@/lib/auth'
+import { getCurrentProfile } from '@/lib/auth'
 import { Resend } from 'resend'
+import { inviteEmailHtml } from '@/lib/email-templates'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function GET() {
   try {
-    await requireAuth()
+    const profile = await getCurrentProfile()
+    if (!profile) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const supabase = createAdminClient()
-    const { data, error } = await supabase
+
+    // Get all profiles
+    let query = supabase
       .from('rr_user_profiles')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // Non-super_admin callers never see super_admin rows
+    if (profile.role !== 'super_admin') {
+      query = query.neq('role', 'super_admin')
+    }
+
+    const { data: profiles, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data)
+
+    // Get auth users for last_sign_in_at and email_confirmed_at
+    const { data: authData } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+    const authMap = new Map(
+      (authData?.users ?? []).map((u) => [
+        u.id,
+        {
+          last_sign_in_at: u.last_sign_in_at ?? null,
+          email_confirmed_at: u.email_confirmed_at ?? null,
+        },
+      ])
+    )
+
+    const enriched = (profiles ?? []).map((p) => ({
+      ...p,
+      last_sign_in_at: authMap.get(p.id)?.last_sign_in_at ?? null,
+      email_confirmed_at: authMap.get(p.id)?.email_confirmed_at ?? null,
+    }))
+
+    return NextResponse.json(enriched)
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -22,18 +53,29 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireAuth()
-    const { email, display_name } = await request.json()
+    const profile = await getCurrentProfile()
+    if (!profile) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (profile.role !== 'admin' && profile.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { email, display_name, role } = await request.json()
 
     if (!email) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    if (!role || !['user', 'admin'].includes(role)) {
+      return NextResponse.json({ error: 'Role must be user or admin' }, { status: 400 })
+    }
 
     const supabase = createAdminClient()
 
-    // Generate invite link
+    // Generate invite link with 7-day expiry
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'invite',
       email,
-      options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/set-password` },
+      options: {
+        redirectTo: 'https://recycledrecordslps.com/admin/set-password',
+        data: { display_name, role },
+      },
     })
 
     if (linkError) {
@@ -41,39 +83,38 @@ export async function POST(request: Request) {
     }
 
     const inviteLink = linkData?.properties?.action_link
+    if (!inviteLink) {
+      return NextResponse.json({ error: 'Failed to generate invite link' }, { status: 500 })
+    }
 
     // Insert profile
     if (linkData?.user?.id) {
-      await supabase.from('rr_user_profiles').upsert({
+      const { error: profileError } = await supabase.from('rr_user_profiles').upsert({
         id: linkData.user.id,
         email,
         display_name: display_name ?? null,
-        role: 'admin',
+        role,
       })
+      if (profileError) {
+        return NextResponse.json({ error: profileError.message }, { status: 500 })
+      }
     }
 
-    // Send invite email via Resend
+    // Send branded invite email via Resend
     await resend.emails.send({
       from: 'Recycled Records LP <noreply@mail.recycledrecordslps.com>',
       to: email,
-      subject: 'You\'re invited to the Recycled Records LP admin panel',
-      html: `
-        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #C4522A;">You're invited!</h2>
-          <p>Hi ${display_name ?? 'there'},</p>
-          <p>You've been invited to manage the Recycled Records LP website. Click the button below to set your password and get started.</p>
-          <a href="${inviteLink}" style="display:inline-block;background:#C4522A;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;">
-            Accept Invite
-          </a>
-          <p style="color:#888;font-size:13px;">This link expires in 24 hours. If you didn't expect this email, you can ignore it.</p>
-          <p style="color:#888;font-size:13px;">— Recycled Records LP</p>
-        </div>
-      `,
+      subject: "You've been invited to the Recycled Records LP team",
+      html: inviteEmailHtml({
+        displayName: display_name ?? email,
+        role,
+        inviteLink,
+      }),
     })
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Error'
+    const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

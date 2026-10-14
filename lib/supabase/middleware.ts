@@ -61,5 +61,21 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Role-based protection for /admin/dashboard/users*
+  if (pathname.startsWith('/admin/dashboard/users')) {
+    const { data: profile } = await supabase
+      .from('rr_user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = profile?.role
+    if (role !== 'admin' && role !== 'super_admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin/dashboard'
+      return NextResponse.redirect(url)
+    }
+  }
+
   return supabaseResponse
 }

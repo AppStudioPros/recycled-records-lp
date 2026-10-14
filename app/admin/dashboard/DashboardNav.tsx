@@ -5,16 +5,25 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LayoutDashboard, FileText, PlusCircle, Users, LogOut, Disc } from 'lucide-react'
 
-const navItems = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/dashboard/posts', label: 'Posts', icon: FileText },
-  { href: '/admin/dashboard/new', label: 'New Post', icon: PlusCircle },
-  { href: '/admin/dashboard/users', label: 'Users', icon: Users },
+const baseNavItems = [
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  { href: '/admin/dashboard/posts', label: 'Posts', icon: FileText, adminOnly: false },
+  { href: '/admin/dashboard/new', label: 'New Post', icon: PlusCircle, adminOnly: false },
+  { href: '/admin/dashboard/users', label: 'Users', icon: Users, adminOnly: true },
 ]
 
-export default function DashboardNav({ email }: { email: string }) {
+export default function DashboardNav({
+  email,
+  role,
+}: {
+  email: string
+  role?: string
+}) {
   const pathname = usePathname()
   const router = useRouter()
+
+  const isAdmin = role === 'admin' || role === 'super_admin'
+  const navItems = baseNavItems.filter((item) => !item.adminOnly || isAdmin)
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -24,7 +33,7 @@ export default function DashboardNav({ email }: { email: string }) {
   }
 
   return (
-    <aside className="w-64 min-h-screen flex flex-col" style={{ background: '#1a0a00' }}>
+    <aside className="w-64 min-h-screen flex flex-col flex-shrink-0" style={{ background: '#1a0a00' }}>
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">

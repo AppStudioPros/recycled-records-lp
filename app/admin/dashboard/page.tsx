@@ -88,7 +88,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex min-h-screen">
-      <DashboardNav email={profile.email} />
+      <DashboardNav email={profile.email} role={profile.role} />
 
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
