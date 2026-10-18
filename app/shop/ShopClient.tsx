@@ -121,6 +121,36 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
     setUiPage(1)
   }, [activeGenre, perPage])
 
+  // When a specific genre is selected, fetch ALL Discogs pages so filtering is complete
+  useEffect(() => {
+    if (activeGenre === 'All') return
+    let cancelled = false
+
+    async function fetchAll() {
+      let page = fetchedPages
+      if (page >= discogsPages) return
+      setFetchingMore(true)
+      while (page < discogsPages) {
+        if (cancelled) break
+        page++
+        try {
+          const res = await fetch(`/api/discogs-listings?page=${page}`)
+          const data = await res.json()
+          const newListings: DiscogsListing[] = data.listings ?? []
+          if (!cancelled) {
+            setAllDiscogs(prev => [...prev, ...newListings])
+            setFetchedPages(page)
+          }
+        } catch { break }
+      }
+      if (!cancelled) setFetchingMore(false)
+    }
+
+    fetchAll()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGenre])
+
   // Smart fetch: load more Discogs pages when the current UI page needs data we don't have yet
   useEffect(() => {
     let cancelled = false
@@ -276,7 +306,8 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
       {allFiltered.length > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1.25rem' }}>
           Showing {countX}–{countY} of {countZ.toLocaleString()} filtered results
-          {allDiscogs.length > 0 && (
+          {fetchingMore && activeGenre !== 'All' && <span style={{ color: '#C4522A', marginLeft: '0.5rem' }}>· Loading all {activeGenre} records…</span>}
+          {allDiscogs.length > 0 && !fetchingMore && (
             <> · <span style={{ color: '#C4522A', fontWeight: 600 }}>Discogs listings</span> ship from the store</>
           )}
         </p>
