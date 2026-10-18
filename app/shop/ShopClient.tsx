@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import type { ShopifyProduct } from '@/lib/shopify'
 import type { DiscogsListing } from '@/lib/discogs'
@@ -116,61 +116,65 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
   const [genreLoading, setGenreLoading] = useState(false) // true while waiting for first full page of genre results
   const [perPage, setPerPage] = useState(50)
   const [uiPage, setUiPage] = useState(1)
+  const allDiscogsRef = React.useRef<DiscogsListing[]>(discogsListings)
+  const fetchedPagesRef = React.useRef(1)
 
   // Reset to page 1 whenever genre or perPage changes
   useEffect(() => {
     setUiPage(1)
   }, [activeGenre, perPage])
 
-  // Fetch Discogs pages until we have enough genre-matched items for the current UI page
+  // Background prefetch: load all Discogs pages on mount, throttled at ~1/sec
   useEffect(() => {
     let cancelled = false
 
-    async function fetchUntilEnough() {
-      const effectivePP = perPage >= 9999 ? Infinity : perPage
-      const needed = uiPage * effectivePP
-
-      const countMatching = (buf: DiscogsListing[]) =>
-        activeGenre === 'All' ? buf.length : buf.filter(l => matchGenreDiscogs(l, activeGenre)).length
-
-      let page = fetchedPages
-      let buf = allDiscogs
-
-      // If we already have enough, nothing to do
-      if (countMatching(buf) >= needed || page >= discogsPages) {
-        setGenreLoading(false)
-        return
-      }
-
-      // Show loading state — hide partial results until we have a full page
-      setGenreLoading(true)
-      setFetchingMore(true)
-
-      while (countMatching(buf) < needed && page < discogsPages) {
+    async function prefetchAll() {
+      let page = fetchedPagesRef.current
+      while (page < discogsPages) {
+        if (cancelled) break
+        await new Promise(r => setTimeout(r, 1000)) // 1 req/sec — under Discogs rate limit
         if (cancelled) break
         page++
         try {
           const res = await fetch(`/api/discogs-listings?page=${page}`)
           const data = await res.json()
           const newListings: DiscogsListing[] = data.listings ?? []
-          buf = [...buf, ...newListings]
+          allDiscogsRef.current = [...allDiscogsRef.current, ...newListings]
+          fetchedPagesRef.current = page
           if (!cancelled) {
-            setAllDiscogs(buf)
+            setAllDiscogs(allDiscogsRef.current)
             setFetchedPages(page)
           }
-        } catch { break }
-      }
-
-      if (!cancelled) {
-        setFetchingMore(false)
-        setGenreLoading(false)
+        } catch { /* continue */ }
       }
     }
 
-    fetchUntilEnough()
+    prefetchAll()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uiPage, perPage, activeGenre])
+  }, [])
+
+  // When genre tab clicked: check if we already have 50 matches; if not show loader briefly
+  useEffect(() => {
+    const countMatching = (buf: DiscogsListing[]) =>
+      activeGenre === 'All' ? buf.length : buf.filter(l => matchGenreDiscogs(l, activeGenre)).length
+
+    if (countMatching(allDiscogsRef.current) >= perPage || fetchedPagesRef.current >= discogsPages) {
+      setGenreLoading(false)
+      return
+    }
+
+    // Not enough yet — show loader, wait for background fetch to supply enough
+    setGenreLoading(true)
+    const interval = setInterval(() => {
+      if (countMatching(allDiscogsRef.current) >= perPage || fetchedPagesRef.current >= discogsPages) {
+        setGenreLoading(false)
+        clearInterval(interval)
+      }
+    }, 500)
+    return () => clearInterval(interval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGenre, perPage])
 
   const filteredShopify = products.filter(p => matchGenreShopify(p, activeGenre))
   const filteredDiscogs = allDiscogs.filter(l => matchGenreDiscogs(l, activeGenre))
