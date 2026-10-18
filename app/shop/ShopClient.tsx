@@ -113,6 +113,7 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
   const [allDiscogs, setAllDiscogs] = useState<DiscogsListing[]>(discogsListings)
   const [fetchedPages, setFetchedPages] = useState(1)
   const [fetchingMore, setFetchingMore] = useState(false)
+  const [genreLoading, setGenreLoading] = useState(false) // true while waiting for first full page of genre results
   const [perPage, setPerPage] = useState(50)
   const [uiPage, setUiPage] = useState(1)
 
@@ -126,21 +127,27 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
     let cancelled = false
 
     async function fetchUntilEnough() {
-      // How many genre-matched items do we need to show uiPage * perPage results?
       const effectivePP = perPage >= 9999 ? Infinity : perPage
       const needed = uiPage * effectivePP
 
-      // Count how many items in the buffer already match the active genre
       const countMatching = (buf: DiscogsListing[]) =>
         activeGenre === 'All' ? buf.length : buf.filter(l => matchGenreDiscogs(l, activeGenre)).length
 
       let page = fetchedPages
       let buf = allDiscogs
 
-      // Keep fetching until we have `needed` genre-matched items or exhaust all pages
+      // If we already have enough, nothing to do
+      if (countMatching(buf) >= needed || page >= discogsPages) {
+        setGenreLoading(false)
+        return
+      }
+
+      // Show loading state — hide partial results until we have a full page
+      setGenreLoading(true)
+      setFetchingMore(true)
+
       while (countMatching(buf) < needed && page < discogsPages) {
         if (cancelled) break
-        setFetchingMore(true)
         page++
         try {
           const res = await fetch(`/api/discogs-listings?page=${page}`)
@@ -153,7 +160,11 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
           }
         } catch { break }
       }
-      if (!cancelled) setFetchingMore(false)
+
+      if (!cancelled) {
+        setFetchingMore(false)
+        setGenreLoading(false)
+      }
     }
 
     fetchUntilEnough()
@@ -288,7 +299,20 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
         </p>
       )}
 
-      {allFiltered.length === 0 ? (
+      {genreLoading ? (
+        <div style={{ padding: '3rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: '#4a3828' }}>
+          <svg viewBox="0 0 80 80" width="64" height="64" aria-hidden="true" style={{ opacity: 0.7 }}>
+            <circle cx="40" cy="40" r="38" fill="#1a1008" />
+            {[34,29,24,19].map(r => <circle key={r} cx="40" cy="40" r={r} fill="none" stroke="#2a1a0a" strokeWidth="0.8" />)}
+            <circle cx="40" cy="40" r="12" fill="#2a1a0a" />
+            <circle cx="40" cy="40" r="4" fill="#0a0a0a" />
+            <circle cx="40" cy="40" r="36" fill="none" stroke="#C4522A" strokeWidth="1.5" strokeDasharray="20 200" opacity="0.6">
+              <animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="1s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+          <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading {activeGenre} records…</p>
+        </div>
+      ) : allFiltered.length === 0 ? (
         <p style={{ color: '#4a3828', padding: '2rem 0' }}>No records in that section right now. Check back or stop in — the in-store selection is much larger.</p>
       ) : (
         <div
