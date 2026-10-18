@@ -218,21 +218,6 @@ export default function ShopClient({ initialListings, total, genres, formats }: 
           />
         </div>
 
-        {/* Genre dropdown */}
-        <div style={{ position: 'relative' }}>
-          <select
-            value={genre}
-            onChange={e => handleGenreChange(e.target.value)}
-            style={selectStyle}
-            aria-label="Filter by genre"
-          >
-            <option value="All">All Genres</option>
-            {genres.map(g => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-        </div>
-
         {/* Format dropdown */}
         <div style={{ position: 'relative' }}>
           <select
@@ -270,7 +255,7 @@ export default function ShopClient({ initialListings, total, genres, formats }: 
       {totalCount > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1.25rem' }}>
           Showing {countX.toLocaleString()}–{countY.toLocaleString()} of {totalCount.toLocaleString()} records
-          {genre !== 'All' && ` in ${genre}`}
+
           {format !== 'All' && ` · ${format}`}
           {search && ` · matching "${search}"`}
         </p>
@@ -294,7 +279,7 @@ export default function ShopClient({ initialListings, total, genres, formats }: 
         </div>
       ) : listings.length === 0 ? (
         <p style={{ color: '#4a3828', padding: '2rem 0' }}>
-          {search || genre !== 'All' || format !== 'All'
+          {search || format !== 'All'
             ? 'No records match those filters. Try broadening your search.'
             : 'No records available right now. Check back soon or stop in — the in-store selection is much larger.'}
         </p>
