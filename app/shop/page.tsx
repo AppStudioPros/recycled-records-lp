@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import Header from '@/components/Header'
-import { getProducts, type ShopifyProduct } from '@/lib/shopify'
-import { getDiscogsInventory, type DiscogsListing } from '@/lib/discogs'
+import type { RRListing } from '@/lib/types/rr-inventory'
 import ShopClient from './ShopClient'
 
 export const metadata: Metadata = {
@@ -21,20 +19,87 @@ export const metadata: Metadata = {
 
 export const revalidate = 60
 
-export default async function ShopPage() {
-  let products: ShopifyProduct[] = []
-  let discogsListings: DiscogsListing[] = []
-  let discogsTotal = 0
-  let discogsPages = 1
-  let error = false
+async function getShopData(): Promise<{
+  listings: RRListing[]
+  total: number
+  genres: string[]
+  formats: string[]
+}> {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://recycledrecordslps.com'
+
   try {
-    ;[products, { listings: discogsListings, total: discogsTotal, pages: discogsPages }] = await Promise.all([
-      getProducts(48).catch(() => []),
-      getDiscogsInventory('RecycledRecordsLp', 100),
+    const [listingsRes, metaRes] = await Promise.all([
+      fetch(`${baseUrl}/api/shop/listings?per_page=50&page=1`, {
+        next: { revalidate: 60 },
+      }),
+      fetch(`${baseUrl}/api/shop/listings/meta`, {
+        next: { revalidate: 300 },
+      }),
     ])
+
+    const listingsData = listingsRes.ok ? await listingsRes.json() : {}
+    const metaData = metaRes.ok ? await metaRes.json() : {}
+
+    const listings: RRListing[] = listingsData.listings ?? []
+    const total: number = listingsData.total ?? 0
+    const genres: string[] = metaData.genres ?? []
+    const formats: string[] = metaData.formats ?? []
+
+    // If Supabase has data, use it
+    if (listings.length > 0) {
+      return { listings, total, genres, formats }
+    }
+
+    // Fallback: fetch first 50 from Discogs directly (initial sync not done yet)
+    const discogsRes = await fetch(
+      'https://api.discogs.com/users/RecycledRecordsLp/inventory?status=For+Sale&per_page=50&sort=listed&sort_order=desc',
+      {
+        headers: {
+          'User-Agent': 'RecycledRecordsLP/1.0 +https://recycledrecordslps.com',
+          Authorization: `Discogs key=${process.env.DISCOGS_CONSUMER_KEY}, secret=${process.env.DISCOGS_CONSUMER_SECRET}`,
+        },
+        next: { revalidate: 300 },
+      }
+    )
+
+    if (!discogsRes.ok) return { listings: [], total: 0, genres: [], formats: [] }
+    const discogsData = await discogsRes.json()
+
+    // Map Discogs listings to RRListing shape
+    const fallbackListings: RRListing[] = (discogsData.listings ?? []).map((l: any) => ({
+      listing_id: l.id,
+      release_id: l.release.id,
+      title: l.release.title ?? null,
+      artist: l.release.artist ?? null,
+      format: l.release.format ?? null,
+      genres: l.release.genres ?? [],
+      styles: l.release.styles ?? [],
+      condition: l.condition ?? null,
+      sleeve_condition: l.sleeve_condition ?? null,
+      price: l.price?.value != null ? parseFloat(String(l.price.value)) : null,
+      currency: l.price?.currency ?? 'USD',
+      listing_url: l.uri ?? null,
+      year: l.release.year ?? null,
+      label: l.release.label ?? null,
+      country: l.release.country ?? null,
+      notes: l.comments ?? null,
+      status: 'For Sale',
+      last_synced: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    }))
+
+    const fallbackTotal = discogsData.pagination?.items ?? fallbackListings.length
+
+    return { listings: fallbackListings, total: fallbackTotal, genres: [], formats: [] }
   } catch {
-    error = true
+    return { listings: [], total: 0, genres: [], formats: [] }
   }
+}
+
+export default async function ShopPage() {
+  const { listings, total, genres, formats } = await getShopData()
+
+  const isEmpty = listings.length === 0 && total === 0
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F0' }}>
@@ -53,19 +118,19 @@ export default async function ShopPage() {
 
       {/* Products */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem 4rem' }}>
-        {error ? (
-          <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#4a3828' }}>
-            <p style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Couldn't load the shop right now. Give us a call and we can help you find what you're looking for.</p>
-            <a href="tel:+17202917000" style={{ color: '#C4522A', fontWeight: 700, fontSize: '1.1rem' }}>720-291-7000</a>
-          </div>
-        ) : products.length === 0 && discogsListings.length === 0 ? (
+        {isEmpty ? (
           <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
             <p style={{ fontFamily: 'var(--font-fraunces)', fontSize: '1.5rem', color: '#1a1008', marginBottom: '0.75rem' }}>The online shop is getting stocked.</p>
             <p style={{ color: '#4a3828', marginBottom: '1.5rem' }}>The real digging is happening in Boulder. Stop in or give us a call.</p>
             <a href="tel:+17202917000" style={{ display: 'inline-block', padding: '0.7rem 1.75rem', backgroundColor: '#C4522A', color: '#FAF7F0', fontWeight: 700, borderRadius: '4px', textDecoration: 'none' }}>Call the shop</a>
           </div>
         ) : (
-          <ShopClient products={products} discogsListings={discogsListings} discogsTotal={discogsTotal} discogsPages={discogsPages} />
+          <ShopClient
+            initialListings={listings}
+            total={total}
+            genres={genres}
+            formats={formats}
+          />
         )}
       </div>
 

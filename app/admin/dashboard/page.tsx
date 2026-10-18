@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import DashboardNav from './DashboardNav'
 import TrafficToggle from './TrafficToggle'
+import SyncInventoryCard from './SyncInventoryCard'
 import { Suspense } from 'react'
 import { FileText, Eye, BarChart2 } from 'lucide-react'
 
@@ -106,6 +107,13 @@ export default async function DashboardPage({
           <p className="text-gray-500 text-sm mb-8">
             Welcome back, {profile.display_name ?? profile.email}
           </p>
+
+          {/* Inventory Sync */}
+          <section className="mb-10">
+            <Suspense fallback={null}>
+              <SyncInventoryCard />
+            </Suspense>
+          </section>
 
           {/* Blog Stats */}
           <section className="mb-10">

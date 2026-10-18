@@ -1,11 +1,9 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import Image from 'next/image'
-import type { ShopifyProduct } from '@/lib/shopify'
-import type { DiscogsListing } from '@/lib/discogs'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import type { RRListing } from '@/lib/types/rr-inventory'
 import DiscogsImage from '@/components/DiscogsImage'
 
-const GENRES = ['All', 'Rock', 'Jazz', 'Soul & Blues', 'Hip-Hop', 'Classical', 'Country & Folk', 'Electronic', 'Pop', 'Metal & Punk', 'Rare & Collectible', 'CDs', 'Other']
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function conditionColor(c: string): string {
   if (!c) return '#888'
@@ -16,66 +14,18 @@ function conditionColor(c: string): string {
   return '#888'
 }
 
-function matchGenreShopify(product: ShopifyProduct, genre: string) {
-  if (genre === 'All') return true
-  const haystack = [product.title, product.productType, ...product.tags].join(' ').toLowerCase()
-  const map: Record<string, string[]> = {
-    'Rock': ['rock', 'alternative', 'indie rock'],
-    'Jazz': ['jazz'],
-    'Soul & Blues': ['soul', 'blues', 'r&b', 'funk'],
-    'Hip-Hop': ['hip-hop', 'hip hop', 'rap'],
-    'Classical': ['classical', 'orchestra', 'symphony', 'opera'],
-    'Country & Folk': ['country', 'folk', 'bluegrass', 'americana'],
-    'Electronic': ['electronic', 'synth', 'techno', 'ambient', 'new wave'],
-    'Pop': ['pop'],
-    'Metal & Punk': ['metal', 'punk', 'hardcore', 'heavy'],
-    'Rare & Collectible': ['rare', 'collectible', 'limited', 'pressing', 'first edition'],
-    'CDs': ['cd', 'compact disc'],
-    'Other': [],
-  }
-  return (map[genre] ?? []).some(t => haystack.includes(t))
-}
-
-function matchGenreDiscogs(listing: DiscogsListing, genre: string) {
-  if (genre === 'All') return true
-  const haystack = [
-    ...(listing.release.genres ?? []),
-    ...(listing.release.styles ?? []),
-    listing.release.title,
-    listing.release.format,
-  ].join(' ').toLowerCase()
-  const map: Record<string, string[]> = {
-    'Rock': ['rock', 'alternative', 'indie rock', 'classic rock'],
-    'Jazz': ['jazz'],
-    'Soul & Blues': ['soul', 'blues', 'r&b', 'funk'],
-    'Hip-Hop': ['hip hop', 'hip-hop', 'rap'],
-    'Classical': ['classical', 'orchestra', 'symphony', 'opera'],
-    'Country & Folk': ['country', 'folk', 'bluegrass', 'americana'],
-    'Electronic': ['electronic', 'synth', 'techno', 'ambient', 'new wave', 'electro'],
-    'Pop': ['pop'],
-    'Metal & Punk': ['metal', 'punk', 'hardcore', 'heavy metal'],
-    'Rare & Collectible': ['rare', 'collectible', 'limited', 'pressing'],
-    'CDs': ['cd', 'compact disc'],
-    'Other': [],
-  }
-  return (map[genre] ?? []).some(t => haystack.includes(t))
-}
-
 function getPageNumbers(current: number, total: number): (number | '...')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-
   const delta = 2
   const rangeStart = Math.max(2, current - delta)
   const rangeEnd = Math.min(total - 1, current + delta)
   const range: number[] = []
   for (let i = rangeStart; i <= rangeEnd; i++) range.push(i)
-
   const pages: (number | '...')[] = [1]
   if (range[0] > 2) pages.push('...')
   pages.push(...range)
   if (range[range.length - 1] < total - 1) pages.push('...')
   pages.push(total)
-
   return pages
 }
 
@@ -100,119 +50,115 @@ function pageBtnStyle(active: boolean, disabled: boolean): React.CSSProperties {
   }
 }
 
-interface Props {
-  products: ShopifyProduct[]
-  discogsListings: DiscogsListing[]
-  discogsTotal: number
-  discogsPages: number
+const selectStyle: React.CSSProperties = {
+  padding: '0.5rem 0.75rem',
+  border: '1.5px solid rgba(26,16,8,0.25)',
+  borderRadius: '6px',
+  backgroundColor: '#FAF7F0',
+  color: '#1a1008',
+  fontWeight: 600,
+  fontSize: '0.85rem',
+  cursor: 'pointer',
+  outline: 'none',
+  minWidth: '130px',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%231a1008' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  paddingRight: '2rem',
 }
 
-export default function ShopClient({ products, discogsListings, discogsTotal, discogsPages }: Props) {
-  const [activeGenre, setActiveGenre] = useState('All')
-  const [adding, setAdding] = useState<string | null>(null)
-  const [allDiscogs, setAllDiscogs] = useState<DiscogsListing[]>(discogsListings)
-  const [fetchedPages, setFetchedPages] = useState(1)
-  const [fetchingMore, setFetchingMore] = useState(false)
-  const [genreLoading, setGenreLoading] = useState(false) // true while waiting for first full page of genre results
+// ── Component ─────────────────────────────────────────────────────────────────
+
+interface Props {
+  initialListings: RRListing[]
+  total: number
+  genres: string[]
+  formats: string[]
+}
+
+export default function ShopClient({ initialListings, total, genres, formats }: Props) {
+  const [search, setSearch] = useState('')
+  const [genre, setGenre] = useState('All')
+  const [format, setFormat] = useState('All')
+  const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(50)
-  const [uiPage, setUiPage] = useState(1)
-  const allDiscogsRef = React.useRef<DiscogsListing[]>(discogsListings)
-  const fetchedPagesRef = React.useRef(1)
+  const [listings, setListings] = useState<RRListing[]>(initialListings)
+  const [totalCount, setTotalCount] = useState(total)
+  const [loading, setLoading] = useState(false)
 
-  // Reset to page 1 whenever genre or perPage changes
-  useEffect(() => {
-    setUiPage(1)
-  }, [activeGenre, perPage])
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSearch = useRef(search)
 
-  // Background prefetch: load all Discogs pages on mount, throttled at ~1/sec
-  useEffect(() => {
-    let cancelled = false
+  // ── Fetch from API ────────────────────────────────────────────────────────
+  const fetchListings = useCallback(
+    async (opts: { search: string; genre: string; format: string; page: number; perPage: number }) => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (opts.search) params.set('search', opts.search)
+        if (opts.genre !== 'All') params.set('genre', opts.genre)
+        if (opts.format !== 'All') params.set('format', opts.format)
+        params.set('page', String(opts.page))
+        params.set('per_page', String(opts.perPage))
 
-    async function prefetchAll() {
-      let page = fetchedPagesRef.current
-      while (page < discogsPages) {
-        if (cancelled) break
-        await new Promise(r => setTimeout(r, 1000)) // 1 req/sec — under Discogs rate limit
-        if (cancelled) break
-        page++
-        try {
-          const res = await fetch(`/api/discogs-listings?page=${page}`)
-          const data = await res.json()
-          const newListings: DiscogsListing[] = data.listings ?? []
-          allDiscogsRef.current = [...allDiscogsRef.current, ...newListings]
-          fetchedPagesRef.current = page
-          if (!cancelled) {
-            setAllDiscogs(allDiscogsRef.current)
-            setFetchedPages(page)
-          }
-        } catch { /* continue */ }
+        const res = await fetch(`/api/shop/listings?${params}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setListings(data.listings ?? [])
+        setTotalCount(data.total ?? 0)
+      } catch { /* ignore */ } finally {
+        setLoading(false)
       }
-    }
+    },
+    []
+  )
 
-    prefetchAll()
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // When genre tab clicked: check if we already have 50 matches; if not show loader briefly
-  useEffect(() => {
-    const countMatching = (buf: DiscogsListing[]) =>
-      activeGenre === 'All' ? buf.length : buf.filter(l => matchGenreDiscogs(l, activeGenre)).length
-
-    if (countMatching(allDiscogsRef.current) >= perPage || fetchedPagesRef.current >= discogsPages) {
-      setGenreLoading(false)
-      return
-    }
-
-    // Not enough yet — show loader, wait for background fetch to supply enough
-    setGenreLoading(true)
-    const interval = setInterval(() => {
-      if (countMatching(allDiscogsRef.current) >= perPage || fetchedPagesRef.current >= discogsPages) {
-        setGenreLoading(false)
-        clearInterval(interval)
-      }
-    }, 500)
-    return () => clearInterval(interval)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGenre, perPage])
-
-  const filteredShopify = products.filter(p => matchGenreShopify(p, activeGenre))
-  const filteredDiscogs = allDiscogs.filter(l => matchGenreDiscogs(l, activeGenre))
-  const allFiltered = [
-    ...filteredShopify.map(p => ({ type: 'shopify' as const, data: p })),
-    ...filteredDiscogs.map(l => ({ type: 'discogs' as const, data: l })),
-  ]
-
-  const effectivePerPage = perPage >= 9999 ? Math.max(allFiltered.length, 1) : perPage
-  const totalUIPages = Math.max(1, Math.ceil(allFiltered.length / effectivePerPage))
-  const start = (uiPage - 1) * effectivePerPage
-  const pageItems = allFiltered.slice(start, start + effectivePerPage)
-
-  const countX = allFiltered.length === 0 ? 0 : start + 1
-  const countY = Math.min(start + effectivePerPage, allFiltered.length)
-  const countZ = allFiltered.length
-
-  const pageNums = getPageNumbers(uiPage, totalUIPages)
-
-  async function handleBuy(product: ShopifyProduct) {
-    const variantId = product.variants.edges[0]?.node?.id
-    if (!variantId) return
-    setAdding(product.id)
-    try {
-      const res = await fetch('/api/cart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variantId }),
-      })
-      const data = await res.json()
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl
-    } catch {
-      alert('Something went wrong. Call us at 720-291-7000.')
-    } finally {
-      setAdding(null)
-    }
+  // ── Debounced search ──────────────────────────────────────────────────────
+  function handleSearchChange(val: string) {
+    setSearch(val)
+    pendingSearch.current = val
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1)
+      fetchListings({ search: pendingSearch.current, genre, format, page: 1, perPage })
+    }, 300)
   }
 
+  // ── Filter changes ────────────────────────────────────────────────────────
+  function handleGenreChange(val: string) {
+    setGenre(val)
+    setPage(1)
+    fetchListings({ search, genre: val, format, page: 1, perPage })
+  }
+
+  function handleFormatChange(val: string) {
+    setFormat(val)
+    setPage(1)
+    fetchListings({ search, genre, format: val, page: 1, perPage })
+  }
+
+  function handlePerPageChange(val: number) {
+    setPerPage(val)
+    setPage(1)
+    fetchListings({ search, genre, format, page: 1, perPage: val })
+  }
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  function handlePageChange(newPage: number) {
+    setPage(newPage)
+    fetchListings({ search, genre, format, page: newPage, perPage })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / perPage))
+  const start = (page - 1) * perPage
+  const countX = totalCount === 0 ? 0 : start + 1
+  const countY = Math.min(start + perPage, totalCount)
+  const pageNums = getPageNumbers(page, totalPages)
+
+  // ── Card styles ───────────────────────────────────────────────────────────
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#fff',
     borderRadius: '8px',
@@ -230,211 +176,206 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
 
   return (
     <div>
-      {/* Genre filter pills + per-page selector */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        {/* Genre pills — flex-wrap left */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-          {GENRES.map(g => (
-            <button
-              key={g}
-              onClick={() => setActiveGenre(g)}
-              style={{
-                padding: '0.4rem 1rem',
-                borderRadius: '999px',
-                border: '1.5px solid',
-                borderColor: activeGenre === g ? '#C4522A' : 'rgba(26,16,8,0.2)',
-                backgroundColor: activeGenre === g ? '#C4522A' : 'transparent',
-                color: activeGenre === g ? '#FAF7F0' : '#4a3828',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                letterSpacing: '0.03em',
-                transition: 'all 0.15s',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {g}
-            </button>
-          ))}
+      {/* ── Filter bar ─────────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.75rem',
+          marginBottom: '1.5rem',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+        }}
+      >
+        {/* Search input */}
+        <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
+          <svg
+            style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4, flexShrink: 0 }}
+            width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search artists, titles, labels…"
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            style={{
+              width: '100%',
+              paddingLeft: '32px',
+              paddingRight: '0.75rem',
+              paddingTop: '0.5rem',
+              paddingBottom: '0.5rem',
+              border: '1.5px solid rgba(26,16,8,0.25)',
+              borderRadius: '6px',
+              backgroundColor: '#FAF7F0',
+              color: '#1a1008',
+              fontSize: '0.85rem',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = '#C4522A')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(26,16,8,0.25)')}
+          />
         </div>
 
-        {/* Per-page selector — right-aligned */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          <label
-            htmlFor="per-page-select"
-            style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a3828' }}
+        {/* Genre dropdown */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={genre}
+            onChange={e => handleGenreChange(e.target.value)}
+            style={selectStyle}
+            aria-label="Filter by genre"
           >
+            <option value="All">All Genres</option>
+            {genres.map(g => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Format dropdown */}
+        <div style={{ position: 'relative' }}>
+          <select
+            value={format}
+            onChange={e => handleFormatChange(e.target.value)}
+            style={selectStyle}
+            aria-label="Filter by format"
+          >
+            <option value="All">All Formats</option>
+            {formats.map(f => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Per page */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <label htmlFor="per-page-select" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a3828' }}>
             Per page:
           </label>
           <select
             id="per-page-select"
             value={perPage}
-            onChange={e => setPerPage(Number(e.target.value))}
-            style={{
-              padding: '0.35rem 0.6rem',
-              border: '1.5px solid rgba(26,16,8,0.3)',
-              borderRadius: '6px',
-              backgroundColor: '#FAF7F0',
-              color: '#1a1008',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              outline: 'none',
-              accentColor: '#C4522A',
-            }}
+            onChange={e => handlePerPageChange(Number(e.target.value))}
+            style={{ ...selectStyle, minWidth: '70px' }}
           >
             <option value={50}>50</option>
             <option value={100}>100</option>
             <option value={200}>200</option>
-            <option value={300}>300</option>
-            <option value={9999}>All</option>
           </select>
         </div>
       </div>
 
-      {/* Count line */}
-      {allFiltered.length > 0 && (
+      {/* ── Count line ─────────────────────────────────────────────────── */}
+      {totalCount > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1.25rem' }}>
-          Showing {countX}–{countY} of {countZ.toLocaleString()} {activeGenre !== 'All' ? activeGenre : ''} records
-          {fetchingMore && <span style={{ color: '#C4522A', marginLeft: '0.5rem' }}>· Loading more…</span>}
-          {!fetchingMore && allDiscogs.length > 0 && (
-            <> · <span style={{ color: '#C4522A', fontWeight: 600 }}>Discogs listings</span> ship from the store</>
-          )}
+          Showing {countX.toLocaleString()}–{countY.toLocaleString()} of {totalCount.toLocaleString()} records
+          {genre !== 'All' && ` in ${genre}`}
+          {format !== 'All' && ` · ${format}`}
+          {search && ` · matching "${search}"`}
         </p>
       )}
 
-      {genreLoading ? (
+      {/* ── Loading spinner ─────────────────────────────────────────────── */}
+      {loading ? (
         <div style={{ padding: '3rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: '#4a3828' }}>
           <svg viewBox="0 0 80 80" width="64" height="64" aria-hidden="true" style={{ opacity: 0.7 }}>
             <circle cx="40" cy="40" r="38" fill="#1a1008" />
-            {[34,29,24,19].map(r => <circle key={r} cx="40" cy="40" r={r} fill="none" stroke="#2a1a0a" strokeWidth="0.8" />)}
+            {[34, 29, 24, 19].map(r => (
+              <circle key={r} cx="40" cy="40" r={r} fill="none" stroke="#2a1a0a" strokeWidth="0.8" />
+            ))}
             <circle cx="40" cy="40" r="12" fill="#2a1a0a" />
             <circle cx="40" cy="40" r="4" fill="#0a0a0a" />
             <circle cx="40" cy="40" r="36" fill="none" stroke="#C4522A" strokeWidth="1.5" strokeDasharray="20 200" opacity="0.6">
               <animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="1s" repeatCount="indefinite" />
             </circle>
           </svg>
-          <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading {activeGenre} records…</p>
+          <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>Loading records…</p>
         </div>
-      ) : allFiltered.length === 0 ? (
-        <p style={{ color: '#4a3828', padding: '2rem 0' }}>No records in that section right now. Check back or stop in — the in-store selection is much larger.</p>
+      ) : listings.length === 0 ? (
+        <p style={{ color: '#4a3828', padding: '2rem 0' }}>
+          {search || genre !== 'All' || format !== 'All'
+            ? 'No records match those filters. Try broadening your search.'
+            : 'No records available right now. Check back soon or stop in — the in-store selection is much larger.'}
+        </p>
       ) : (
+        /* ── Product grid ─────────────────────────────────────────────── */
         <div
           className="shop-product-grid"
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}
         >
-          {pageItems.map(item => {
-            /* ── Shopify product card ── */
-            if (item.type === 'shopify') {
-              const product = item.data as ShopifyProduct
-              const image = product.images.edges[0]?.node
-              const price = product.priceRange.minVariantPrice
-              const variant = product.variants.edges[0]?.node
-              const available = variant?.availableForSale ?? false
-              const formattedPrice = new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: price.currencyCode,
-              }).format(parseFloat(price.amount))
-
-              return (
-                <div key={product.id} style={cardStyle}>
-                  <div style={imgWrap}>
-                    {image ? (
-                      <Image
-                        src={image.url}
-                        alt={image.altText || product.title}
-                        fill
-                        sizes="(max-width: 640px) 50vw, 200px"
-                        style={{ objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ width: '55%', aspectRatio: '1', borderRadius: '50%', backgroundColor: '#1a1008', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '28%', aspectRatio: '1', borderRadius: '50%', backgroundColor: '#4a3828' }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ padding: '0.75rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1a1008', lineHeight: 1.3, margin: 0 }}>{product.title}</p>
-                    {product.productType && (
-                      <p style={{ fontSize: '0.7rem', color: '#C4522A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
-                        {product.productType}
-                      </p>
-                    )}
-                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1a1008', marginTop: '0.2rem' }}>{formattedPrice}</p>
-                  </div>
-                  <div style={{ padding: '0 0.75rem 0.75rem' }}>
-                    {available ? (
-                      <button
-                        onClick={() => handleBuy(product)}
-                        disabled={adding === product.id}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem',
-                          backgroundColor: adding === product.id ? '#9a3f1e' : '#C4522A',
-                          color: '#FAF7F0',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: adding === product.id ? 'wait' : 'pointer',
-                          letterSpacing: '0.04em',
-                        }}
-                      >
-                        {adding === product.id ? 'Going to checkout…' : 'Buy Now'}
-                      </button>
-                    ) : (
-                      <p style={{ fontSize: '0.75rem', color: '#888', textAlign: 'center', margin: 0, fontStyle: 'italic' }}>Sold in store</p>
-                    )}
-                  </div>
-                </div>
-              )
-            }
-
-            /* ── Discogs listing card ── */
-            const listing = item.data as DiscogsListing
-            const price = listing.price?.value
-              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: listing.price.currency || 'USD' }).format(listing.price.value)
+          {listings.map(listing => {
+            const price = listing.price != null
+              ? new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: listing.currency || 'USD',
+                }).format(listing.price)
               : null
+
             const condition = listing.condition || ''
-            const discogsUrl = `https://www.discogs.com/sell/item/${listing.id}`
+            const buyUrl = `https://www.discogs.com/sell/item/${listing.listing_id}`
 
             return (
-              <div key={`discogs-${listing.id}`} style={cardStyle}>
+              <div key={listing.listing_id} style={cardStyle}>
+                {/* Image */}
                 <div style={imgWrap}>
-                  <DiscogsImage listingId={listing.id} title={listing.release.title} />
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(26,16,8,0.75)', color: '#FAF7F0', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em', padding: '2px 6px', borderRadius: '3px' }}>
+                  <DiscogsImage listingId={listing.listing_id} title={listing.title ?? ''} />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      left: '8px',
+                      background: 'rgba(26,16,8,0.75)',
+                      color: '#FAF7F0',
+                      fontSize: '0.6rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      padding: '2px 6px',
+                      borderRadius: '3px',
+                    }}
+                  >
                     DISCOGS
                   </div>
                 </div>
+
+                {/* Info */}
                 <div style={{ padding: '0.75rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                   <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1a1008', lineHeight: 1.3, margin: 0 }}>
-                    {listing.release.artist && (
-                      <span style={{ fontWeight: 500, color: '#4a3828' }}>{listing.release.artist} — </span>
+                    {listing.artist && (
+                      <span style={{ fontWeight: 500, color: '#4a3828' }}>{listing.artist} — </span>
                     )}
-                    {listing.release.title}
+                    {listing.title}
                   </p>
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    {listing.release.format && (
+                    {listing.format && (
                       <p style={{ fontSize: '0.7rem', color: '#C4522A', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
-                        {listing.release.format}
+                        {listing.format.split(',')[0].trim()}
                       </p>
                     )}
-                    {listing.release.year > 0 && (
-                      <p style={{ fontSize: '0.7rem', color: '#888', margin: 0 }}>{listing.release.year}</p>
+                    {listing.year != null && listing.year > 0 && (
+                      <p style={{ fontSize: '0.7rem', color: '#888', margin: 0 }}>{listing.year}</p>
+                    )}
+                    {listing.label && (
+                      <p style={{ fontSize: '0.7rem', color: '#888', margin: 0 }}>· {listing.label}</p>
                     )}
                   </div>
+
                   {condition && (
-                    <p style={{ fontSize: '0.7rem', fontWeight: 700, color: conditionColor(condition), margin: 0 }}>{condition}</p>
+                    <p style={{ fontSize: '0.7rem', fontWeight: 700, color: conditionColor(condition), margin: 0 }}>
+                      {condition}
+                    </p>
                   )}
+
                   {price && (
                     <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1a1008', marginTop: '0.2rem' }}>{price}</p>
                   )}
                 </div>
+
+                {/* CTA */}
                 <div style={{ padding: '0 0.75rem 0.75rem' }}>
                   <a
-                    href={discogsUrl}
+                    href={buyUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -461,18 +402,14 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
         </div>
       )}
 
-      {/* Pagination Controls */}
-      {totalUIPages > 1 && (
+      {/* ── Pagination ─────────────────────────────────────────────────── */}
+      {totalPages > 1 && !loading && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginTop: '2.5rem' }}>
-          {fetchingMore && (
-            <p style={{ fontSize: '0.8rem', color: '#C4522A', fontWeight: 600, margin: 0 }}>Loading…</p>
-          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            {/* Left arrow */}
             <button
-              onClick={() => setUiPage(p => Math.max(1, p - 1))}
-              disabled={uiPage === 1}
-              style={pageBtnStyle(false, uiPage === 1)}
+              onClick={() => handlePageChange(Math.max(1, page - 1))}
+              disabled={page === 1}
+              style={pageBtnStyle(false, page === 1)}
               aria-label="Previous page"
             >
               ←
@@ -489,21 +426,20 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
               ) : (
                 <button
                   key={p}
-                  onClick={() => setUiPage(p as number)}
-                  style={pageBtnStyle(p === uiPage, false)}
+                  onClick={() => handlePageChange(p as number)}
+                  style={pageBtnStyle(p === page, false)}
                   aria-label={`Page ${p}`}
-                  aria-current={p === uiPage ? 'page' : undefined}
+                  aria-current={p === page ? 'page' : undefined}
                 >
                   {p}
                 </button>
               )
             )}
 
-            {/* Right arrow */}
             <button
-              onClick={() => setUiPage(p => Math.min(totalUIPages, p + 1))}
-              disabled={uiPage === totalUIPages}
-              style={pageBtnStyle(false, uiPage === totalUIPages)}
+              onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              style={pageBtnStyle(false, page === totalPages)}
               aria-label="Next page"
             >
               →
