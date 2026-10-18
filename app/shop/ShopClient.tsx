@@ -121,24 +121,34 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
     setUiPage(1)
   }, [activeGenre, perPage])
 
-  // When a specific genre is selected, fetch ALL Discogs pages so filtering is complete
+  // Fetch Discogs pages until we have enough genre-matched items for the current UI page
   useEffect(() => {
-    if (activeGenre === 'All') return
     let cancelled = false
 
-    async function fetchAll() {
+    async function fetchUntilEnough() {
+      // How many genre-matched items do we need to show uiPage * perPage results?
+      const effectivePP = perPage >= 9999 ? Infinity : perPage
+      const needed = uiPage * effectivePP
+
+      // Count how many items in the buffer already match the active genre
+      const countMatching = (buf: DiscogsListing[]) =>
+        activeGenre === 'All' ? buf.length : buf.filter(l => matchGenreDiscogs(l, activeGenre)).length
+
       let page = fetchedPages
-      if (page >= discogsPages) return
-      setFetchingMore(true)
-      while (page < discogsPages) {
+      let buf = allDiscogs
+
+      // Keep fetching until we have `needed` genre-matched items or exhaust all pages
+      while (countMatching(buf) < needed && page < discogsPages) {
         if (cancelled) break
+        setFetchingMore(true)
         page++
         try {
           const res = await fetch(`/api/discogs-listings?page=${page}`)
           const data = await res.json()
           const newListings: DiscogsListing[] = data.listings ?? []
+          buf = [...buf, ...newListings]
           if (!cancelled) {
-            setAllDiscogs(prev => [...prev, ...newListings])
+            setAllDiscogs(buf)
             setFetchedPages(page)
           }
         } catch { break }
@@ -146,46 +156,10 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
       if (!cancelled) setFetchingMore(false)
     }
 
-    fetchAll()
+    fetchUntilEnough()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGenre])
-
-  // Smart fetch: load more Discogs pages when the current UI page needs data we don't have yet
-  useEffect(() => {
-    let cancelled = false
-
-    async function ensureData(targetPage: number, pp: number) {
-      const needed = pp >= 9999 ? Infinity : targetPage * pp
-      let page = fetchedPages
-      let currentLength = allDiscogs.length
-
-      if (currentLength >= needed || page >= discogsPages) return
-
-      setFetchingMore(true)
-      while (currentLength < needed && page < discogsPages) {
-        if (cancelled) break
-        page++
-        try {
-          const res = await fetch(`/api/discogs-listings?page=${page}`)
-          const data = await res.json()
-          const newListings: DiscogsListing[] = data.listings ?? []
-          currentLength += newListings.length
-          if (!cancelled) {
-            setAllDiscogs(prev => [...prev, ...newListings])
-            setFetchedPages(page)
-          }
-        } catch {
-          break
-        }
-      }
-      if (!cancelled) setFetchingMore(false)
-    }
-
-    ensureData(uiPage, perPage)
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uiPage, perPage])
+  }, [uiPage, perPage, activeGenre])
 
   const filteredShopify = products.filter(p => matchGenreShopify(p, activeGenre))
   const filteredDiscogs = allDiscogs.filter(l => matchGenreDiscogs(l, activeGenre))
@@ -305,9 +279,9 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
       {/* Count line */}
       {allFiltered.length > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1.25rem' }}>
-          Showing {countX}–{countY} of {countZ.toLocaleString()} filtered results
-          {fetchingMore && activeGenre !== 'All' && <span style={{ color: '#C4522A', marginLeft: '0.5rem' }}>· Loading all {activeGenre} records…</span>}
-          {allDiscogs.length > 0 && !fetchingMore && (
+          Showing {countX}–{countY} of {countZ.toLocaleString()} {activeGenre !== 'All' ? activeGenre : ''} records
+          {fetchingMore && <span style={{ color: '#C4522A', marginLeft: '0.5rem' }}>· Loading more…</span>}
+          {!fetchingMore && allDiscogs.length > 0 && (
             <> · <span style={{ color: '#C4522A', fontWeight: 600 }}>Discogs listings</span> ship from the store</>
           )}
         </p>
