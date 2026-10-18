@@ -113,7 +113,7 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
   const [allDiscogs, setAllDiscogs] = useState<DiscogsListing[]>(discogsListings)
   const [fetchedPages, setFetchedPages] = useState(1)
   const [fetchingMore, setFetchingMore] = useState(false)
-  const [perPage, setPerPage] = useState(100)
+  const [perPage, setPerPage] = useState(50)
   const [uiPage, setUiPage] = useState(1)
 
   // Reset to page 1 whenever genre or perPage changes
@@ -268,6 +268,7 @@ export default function ShopClient({ products, discogsListings, discogsTotal, di
               accentColor: '#C4522A',
             }}
           >
+            <option value={50}>50</option>
             <option value={100}>100</option>
             <option value={200}>200</option>
             <option value={300}>300</option>
