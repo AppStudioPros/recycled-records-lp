@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import GenreCrates from '@/components/genre-crates';
 import Header from '@/components/Header';
+import MadeByWDP365 from '@/components/MadeByWDP365';
 import ScrollReveal from '@/components/ScrollReveal';
 import VinylStamp from '@/components/VinylStamp';
 import { store } from '@/lib/store';
@@ -110,7 +111,7 @@ export default function Home() {
         </div>
       </section>
     </main>
-    <footer><a className="footer-brand" href="#">Recycled Records LP</a><p>Boulder, Colorado · Buy. Sell. Listen.</p><span>Good records find good homes.</span></footer>
+    <footer style={{flexDirection:'column',alignItems:'center',gap:'16px'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',flexWrap:'wrap',gap:'10px'}}><a className="footer-brand" href="#">Recycled Records LP</a><p>Boulder, Colorado · Buy. Sell. Listen.</p><span>Good records find good homes.</span></div><MadeByWDP365 theme="light" projectCode="recycled-records" size="compact" /></footer>
     <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}} />
     <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(faqLd).replace(/</g,'\\u003c')}} />
   </>;
