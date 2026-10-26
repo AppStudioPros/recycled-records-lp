@@ -1,8 +1,12 @@
 'use client'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import { ShoppingCart } from 'lucide-react'
 import type { RRListing } from '@/lib/types/rr-inventory'
 import type { ShopifyProduct } from '@/lib/shopify'
 import DiscogsImage from '@/components/DiscogsImage'
+import CartDrawer from '@/components/CartDrawer'
+import { useCart } from '@/contexts/CartContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,7 +85,10 @@ interface Props {
 }
 
 export default function ShopClient({ initialListings, total, genres, formats, shopifyProducts = [] }: Props) {
+  const { itemCount, addItem } = useCart()
   const [shopTab, setShopTab] = useState<'discogs' | 'shopify'>('discogs')
+  const [cartOpen, setCartOpen] = useState(false)
+
   const [search, setSearch] = useState('')
   const [genre, setGenre] = useState('All')
   const [format, setFormat] = useState('All')
@@ -129,7 +136,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     }, 300)
   }
 
-  // ── Filter changes ────────────────────────────────────────────────────────
   function handleGenreChange(val: string) {
     setGenre(val)
     setPage(1)
@@ -148,7 +154,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     fetchListings({ search, genre, format, page: 1, perPage: val })
   }
 
-  // ── Pagination ────────────────────────────────────────────────────────────
   function handlePageChange(newPage: number) {
     setPage(newPage)
     fetchListings({ search, genre, format, page: newPage, perPage })
@@ -169,6 +174,9 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     border: '1px solid rgba(26,16,8,0.1)',
     display: 'flex',
     flexDirection: 'column',
+    transition: 'box-shadow 0.15s, transform 0.15s',
+    textDecoration: 'none',
+    color: 'inherit',
   }
 
   const imgWrap: React.CSSProperties = {
@@ -184,7 +192,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
   const [sfPerPage, setSfPerPage] = useState(50)
   const [sfPage, setSfPage] = useState(1)
 
-  // Derived Shopify filter options from product tags + productType
   const sfGenres = React.useMemo(() => {
     const all = shopifyProducts.flatMap(p => p.tags)
     return ['All', ...[...new Set(all)].filter(Boolean).sort()]
@@ -195,7 +202,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     return ['All', ...[...new Set(all)].sort()]
   }, [shopifyProducts])
 
-  // Filtered + paginated Shopify products
   const sfFiltered = React.useMemo(() => {
     let results = shopifyProducts
     if (sfSearch.trim()) {
@@ -210,22 +216,66 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
   const sfTotalPages = Math.max(1, Math.ceil(sfFiltered.length / sfPerPage))
   const sfPageItems = sfFiltered.slice((sfPage - 1) * sfPerPage, sfPage * sfPerPage)
 
-  async function handleBuy(variantId: string) {
-    try {
-      const res = await fetch('/api/cart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variantId }),
-      })
-      const data = await res.json()
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl
-    } catch { /* silent */ }
-  }
-
+  // Tab bar with optional cart icon on Shopify tab
   const tabBar = (active: 'discogs' | 'shopify') => (
-    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-      <button onClick={() => setShopTab('discogs')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: active === 'discogs' ? 'none' : '1.5px solid rgba(26,16,8,0.25)', backgroundColor: active === 'discogs' ? '#C4522A' : 'transparent', color: active === 'discogs' ? '#FAF7F0' : '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Discogs</button>
-      <button onClick={() => setShopTab('shopify')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: active === 'shopify' ? 'none' : '1.5px solid rgba(26,16,8,0.25)', backgroundColor: active === 'shopify' ? '#C4522A' : 'transparent', color: active === 'shopify' ? '#FAF7F0' : '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Shopify</button>
+    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', alignItems: 'center' }}>
+      <button
+        onClick={() => setShopTab('discogs')}
+        style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: active === 'discogs' ? 'none' : '1.5px solid rgba(26,16,8,0.25)', backgroundColor: active === 'discogs' ? '#C4522A' : 'transparent', color: active === 'discogs' ? '#FAF7F0' : '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+      >
+        Discogs
+      </button>
+      <button
+        onClick={() => setShopTab('shopify')}
+        style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: active === 'shopify' ? 'none' : '1.5px solid rgba(26,16,8,0.25)', backgroundColor: active === 'shopify' ? '#C4522A' : 'transparent', color: active === 'shopify' ? '#FAF7F0' : '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+      >
+        Shopify
+      </button>
+
+      {/* Cart icon — only on Shopify tab */}
+      {active === 'shopify' && (
+        <button
+          onClick={() => setCartOpen(true)}
+          aria-label={`Cart (${itemCount} items)`}
+          style={{
+            marginLeft: 'auto',
+            position: 'relative',
+            background: 'none',
+            border: '1.5px solid rgba(26,16,8,0.2)',
+            borderRadius: '6px',
+            padding: '0.45rem 0.7rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            color: '#1a1008',
+          }}
+        >
+          <ShoppingCart size={18} />
+          {itemCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '-7px',
+                right: '-7px',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                backgroundColor: '#C4522A',
+                color: '#FAF7F0',
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}
+            >
+              {itemCount > 99 ? '99+' : itemCount}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   )
 
@@ -234,9 +284,11 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
       <div>
         {tabBar('shopify')}
 
-        {/* Filter bar — mirrors Discogs */}
+        {/* Cart drawer */}
+        <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+
+        {/* Filter bar */}
         <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Search */}
           <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
             <svg style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4, flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
             <input
@@ -247,7 +299,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
               style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2rem', border: '1.5px solid rgba(26,16,8,0.25)', borderRadius: '6px', backgroundColor: '#FAF7F0', color: '#1a1008', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
-          {/* Genre */}
           {sfGenres.length > 1 && (
             <div style={{ position: 'relative' }}>
               <select value={sfGenre} onChange={e => { setSfGenre(e.target.value); setSfPage(1) }} style={selectStyle} aria-label="Filter by genre">
@@ -255,7 +306,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
               </select>
             </div>
           )}
-          {/* Format */}
           {sfFormats.length > 1 && (
             <div style={{ position: 'relative' }}>
               <select value={sfFormat} onChange={e => { setSfFormat(e.target.value); setSfPage(1) }} style={selectStyle} aria-label="Filter by format">
@@ -263,7 +313,6 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
               </select>
             </div>
           )}
-          {/* Per page */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a3828' }}>Per page:</label>
             <select value={sfPerPage} onChange={e => { setSfPerPage(Number(e.target.value)); setSfPage(1) }} style={{ ...selectStyle, minWidth: '70px' }}>
@@ -283,8 +332,13 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
               const price = parseFloat(product.priceRange.minVariantPrice.amount).toFixed(2)
               const variant = product.variants.edges[0]?.node
               return (
-                <div key={product.id} style={{ border: '1.5px solid rgba(26,16,8,0.12)', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', display: 'flex', flexDirection: 'column' }}>
+                <Link
+                  key={product.id}
+                  href={`/shop/product/${product.handle}`}
+                  style={{ border: '1.5px solid rgba(26,16,8,0.12)', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', textDecoration: 'none', color: 'inherit' }}
+                >
                   {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={image.url} alt={image.altText ?? product.title} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} loading="eager" />
                   ) : (
                     <div style={{ width: '100%', aspectRatio: '1', backgroundColor: '#e8e0d4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '0.8rem' }}>No image</div>
@@ -293,12 +347,27 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
                     <p style={{ fontWeight: 700, color: '#1a1008', fontSize: '0.9rem', marginBottom: '0.25rem', lineHeight: 1.35 }}>{product.title}</p>
                     <p style={{ color: '#C4522A', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem' }}>${price}</p>
                     {variant?.availableForSale ? (
-                      <button onClick={() => handleBuy(variant.id)} style={{ marginTop: 'auto', padding: '0.5rem', backgroundColor: '#1a1008', color: '#FAF7F0', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>Buy Now</button>
+                      <button
+                        onClick={e => {
+                          e.preventDefault()
+                          addItem({
+                            variantId: variant.id,
+                            productId: product.id,
+                            title: product.title,
+                            price: product.priceRange.minVariantPrice.amount,
+                            image: image?.url,
+                          })
+                          setCartOpen(true)
+                        }}
+                        style={{ marginTop: 'auto', padding: '0.5rem', backgroundColor: '#1a1008', color: '#FAF7F0', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                      >
+                        Add to Cart
+                      </button>
                     ) : (
                       <span style={{ marginTop: 'auto', textAlign: 'center', fontSize: '0.8rem', color: '#888', fontWeight: 600 }}>Sold Out</span>
                     )}
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>
@@ -319,20 +388,12 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     )
   }
 
+  // ── DISCOGS tab ───────────────────────────────────────────────────────────
   return (
     <div>
       {tabBar('discogs')}
-      {/* ── Filter bar ─────────────────────────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.75rem',
-          marginBottom: '1.5rem',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-        }}
-      >
-        {/* Search input */}
+      {/* Filter bar */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
           <svg
             style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4, flexShrink: 0 }}
@@ -345,68 +406,31 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
             placeholder="Search artists, titles, labels…"
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
-            style={{
-              width: '100%',
-              paddingLeft: '32px',
-              paddingRight: '0.75rem',
-              paddingTop: '0.5rem',
-              paddingBottom: '0.5rem',
-              border: '1.5px solid rgba(26,16,8,0.25)',
-              borderRadius: '6px',
-              backgroundColor: '#FAF7F0',
-              color: '#1a1008',
-              fontSize: '0.85rem',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            style={{ width: '100%', paddingLeft: '32px', paddingRight: '0.75rem', paddingTop: '0.5rem', paddingBottom: '0.5rem', border: '1.5px solid rgba(26,16,8,0.25)', borderRadius: '6px', backgroundColor: '#FAF7F0', color: '#1a1008', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
             onFocus={e => (e.currentTarget.style.borderColor = '#C4522A')}
             onBlur={e => (e.currentTarget.style.borderColor = 'rgba(26,16,8,0.25)')}
           />
         </div>
 
-        {/* Genre dropdown */}
         {genres.length > 0 && (
           <div style={{ position: 'relative' }}>
-            <select
-              value={genre}
-              onChange={e => handleGenreChange(e.target.value)}
-              style={selectStyle}
-              aria-label="Filter by genre"
-            >
+            <select value={genre} onChange={e => handleGenreChange(e.target.value)} style={selectStyle} aria-label="Filter by genre">
               <option value="All">All Genres</option>
-              {genres.map(g => (
-                <option key={g} value={g}>{g}</option>
-              ))}
+              {genres.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
         )}
 
-        {/* Format dropdown */}
         <div style={{ position: 'relative' }}>
-          <select
-            value={format}
-            onChange={e => handleFormatChange(e.target.value)}
-            style={selectStyle}
-            aria-label="Filter by format"
-          >
+          <select value={format} onChange={e => handleFormatChange(e.target.value)} style={selectStyle} aria-label="Filter by format">
             <option value="All">All Formats</option>
-            {formats.map(f => (
-              <option key={f} value={f}>{f}</option>
-            ))}
+            {formats.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         </div>
 
-        {/* Per page */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          <label htmlFor="per-page-select" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a3828' }}>
-            Per page:
-          </label>
-          <select
-            id="per-page-select"
-            value={perPage}
-            onChange={e => handlePerPageChange(Number(e.target.value))}
-            style={{ ...selectStyle, minWidth: '70px' }}
-          >
+          <label htmlFor="per-page-select" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a3828' }}>Per page:</label>
+          <select id="per-page-select" value={perPage} onChange={e => handlePerPageChange(Number(e.target.value))} style={{ ...selectStyle, minWidth: '70px' }}>
             <option value={50}>50</option>
             <option value={100}>100</option>
             <option value={200}>200</option>
@@ -414,24 +438,19 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
         </div>
       </div>
 
-      {/* ── Count line ─────────────────────────────────────────────────── */}
       {totalCount > 0 && (
         <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1.25rem' }}>
           Showing {countX.toLocaleString()}–{countY.toLocaleString()} of {totalCount.toLocaleString()} records
-
           {format !== 'All' && ` · ${format}`}
           {search && ` · matching "${search}"`}
         </p>
       )}
 
-      {/* ── Loading spinner ─────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ padding: '3rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', color: '#4a3828' }}>
           <svg viewBox="0 0 80 80" width="64" height="64" aria-hidden="true" style={{ opacity: 0.7 }}>
             <circle cx="40" cy="40" r="38" fill="#1a1008" />
-            {[34, 29, 24, 19].map(r => (
-              <circle key={r} cx="40" cy="40" r={r} fill="none" stroke="#2a1a0a" strokeWidth="0.8" />
-            ))}
+            {[34, 29, 24, 19].map(r => <circle key={r} cx="40" cy="40" r={r} fill="none" stroke="#2a1a0a" strokeWidth="0.8" />)}
             <circle cx="40" cy="40" r="12" fill="#2a1a0a" />
             <circle cx="40" cy="40" r="4" fill="#0a0a0a" />
             <circle cx="40" cy="40" r="36" fill="none" stroke="#C4522A" strokeWidth="1.5" strokeDasharray="20 200" opacity="0.6">
@@ -447,41 +466,23 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
             : 'No records available right now. Check back soon or stop in — the in-store selection is much larger.'}
         </p>
       ) : (
-        /* ── Product grid ─────────────────────────────────────────────── */
-        <div
-          className="shop-product-grid"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}
-        >
+        <div className="shop-product-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
           {listings.map(listing => {
             const price = listing.price != null
-              ? new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: listing.currency || 'USD',
-                }).format(listing.price)
+              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: listing.currency || 'USD' }).format(listing.price)
               : null
-
             const condition = listing.condition || ''
-            const buyUrl = `https://www.discogs.com/sell/item/${listing.listing_id}`
 
             return (
-              <div key={listing.listing_id} style={cardStyle}>
+              <Link
+                key={listing.listing_id}
+                href={`/shop/listing/${listing.listing_id}`}
+                style={cardStyle}
+              >
                 {/* Image */}
                 <div style={imgWrap}>
                   <DiscogsImage listingId={listing.listing_id} title={listing.title ?? ''} />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      background: 'rgba(26,16,8,0.75)',
-                      color: '#FAF7F0',
-                      fontSize: '0.6rem',
-                      fontWeight: 700,
-                      letterSpacing: '0.08em',
-                      padding: '2px 6px',
-                      borderRadius: '3px',
-                    }}
-                  >
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(26,16,8,0.75)', color: '#FAF7F0', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em', padding: '2px 6px', borderRadius: '3px' }}>
                     DISCOGS
                   </div>
                 </div>
@@ -522,10 +523,7 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
 
                 {/* CTA */}
                 <div style={{ padding: '0 0.75rem 0.75rem' }}>
-                  <a
-                    href={buyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <span
                     style={{
                       display: 'block',
                       width: '100%',
@@ -537,61 +535,31 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
                       borderRadius: '4px',
                       textAlign: 'center',
                       letterSpacing: '0.04em',
-                      textDecoration: 'none',
                       boxSizing: 'border-box',
                     }}
                   >
-                    Buy on Discogs
-                  </a>
+                    View Details
+                  </span>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>
       )}
 
-      {/* ── Pagination ─────────────────────────────────────────────────── */}
+      {/* Pagination */}
       {totalPages > 1 && !loading && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', marginTop: '2.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button
-              onClick={() => handlePageChange(Math.max(1, page - 1))}
-              disabled={page === 1}
-              style={pageBtnStyle(false, page === 1)}
-              aria-label="Previous page"
-            >
-              ←
-            </button>
-
+            <button onClick={() => handlePageChange(Math.max(1, page - 1))} disabled={page === 1} style={pageBtnStyle(false, page === 1)} aria-label="Previous page">←</button>
             {pageNums.map((p, i) =>
               p === '...' ? (
-                <span
-                  key={`ellipsis-${i}`}
-                  style={{ padding: '0.4rem 0.25rem', color: '#888', fontSize: '0.85rem', userSelect: 'none' }}
-                >
-                  …
-                </span>
+                <span key={`ellipsis-${i}`} style={{ padding: '0.4rem 0.25rem', color: '#888', fontSize: '0.85rem', userSelect: 'none' }}>…</span>
               ) : (
-                <button
-                  key={p}
-                  onClick={() => handlePageChange(p as number)}
-                  style={pageBtnStyle(p === page, false)}
-                  aria-label={`Page ${p}`}
-                  aria-current={p === page ? 'page' : undefined}
-                >
-                  {p}
-                </button>
+                <button key={p} onClick={() => handlePageChange(p as number)} style={pageBtnStyle(p === page, false)} aria-label={`Page ${p}`} aria-current={p === page ? 'page' : undefined}>{p}</button>
               )
             )}
-
-            <button
-              onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-              style={pageBtnStyle(false, page === totalPages)}
-              aria-label="Next page"
-            >
-              →
-            </button>
+            <button onClick={() => handlePageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} style={pageBtnStyle(false, page === totalPages)} aria-label="Next page">→</button>
           </div>
         </div>
       )}

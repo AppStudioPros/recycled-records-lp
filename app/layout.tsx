@@ -8,6 +8,7 @@ import '@fontsource/dm-sans/latin-700.css';
 import './globals.css';
 import { store } from '@/lib/store';
 import PageTracker from '@/components/PageTracker';
+import { CartProvider } from '@/contexts/CartContext';
 
 export const metadata: Metadata = {
   metadataBase: new URL(store.siteUrl),
@@ -22,9 +23,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
-        <PageTracker />
-        {children}
-        <Analytics />
+        <CartProvider>
+          <PageTracker />
+          {children}
+          <Analytics />
+        </CartProvider>
       </body>
     </html>
   );

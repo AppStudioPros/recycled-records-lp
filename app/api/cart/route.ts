@@ -4,18 +4,34 @@ const DOMAIN = '2us6ss-bi.myshopify.com'
 const API_VERSION = '2026-07'
 const ENDPOINT = `https://${DOMAIN}/api/${API_VERSION}/graphql.json`
 
-export async function POST(req: NextRequest) {
-  const { variantId, quantity = 1 } = await req.json()
-  if (!variantId) return NextResponse.json({ error: 'Missing variantId' }, { status: 400 })
+type LineInput = { variantId: string; quantity: number }
 
-  const query = `
-    mutation CartCreate($variantId: ID!, $quantity: Int!) {
-      cartCreate(input: { lines: [{ merchandiseId: $variantId, quantity: $quantity }] }) {
+export async function POST(req: NextRequest) {
+  const body = await req.json()
+
+  // Support both multi-line { lines: [...] } and legacy single { variantId, quantity }
+  let lines: LineInput[]
+  if (Array.isArray(body.lines) && body.lines.length > 0) {
+    lines = body.lines
+  } else if (body.variantId) {
+    lines = [{ variantId: body.variantId, quantity: body.quantity ?? 1 }]
+  } else {
+    return NextResponse.json({ error: 'Missing variantId or lines' }, { status: 400 })
+  }
+
+  const mutation = `
+    mutation CartCreate($lines: [CartLineInput!]!) {
+      cartCreate(input: { lines: $lines }) {
         cart { id checkoutUrl }
         userErrors { field message }
       }
     }
   `
+
+  const cartLines = lines.map(l => ({
+    merchandiseId: l.variantId,
+    quantity: l.quantity,
+  }))
 
   const res = await fetch(ENDPOINT, {
     method: 'POST',
@@ -23,7 +39,7 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
       'Shopify-Storefront-Private-Token': process.env.SHOPIFY_STOREFRONT_PRIVATE_TOKEN!,
     },
-    body: JSON.stringify({ query, variables: { variantId, quantity } }),
+    body: JSON.stringify({ query: mutation, variables: { lines: cartLines } }),
   })
 
   const data = await res.json()

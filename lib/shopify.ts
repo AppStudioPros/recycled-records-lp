@@ -27,6 +27,28 @@ export type ShopifyProduct = {
   tags: string[]
 }
 
+export type ShopifyProductDetail = {
+  id: string
+  title: string
+  handle: string
+  description: string
+  descriptionHtml: string
+  productType: string
+  tags: string[]
+  priceRange: { minVariantPrice: { amount: string; currencyCode: string } }
+  images: { edges: { node: { url: string; altText: string | null } }[] }
+  variants: {
+    edges: {
+      node: {
+        id: string
+        title: string
+        availableForSale: boolean
+        price: { amount: string; currencyCode: string }
+      }
+    }[]
+  }
+}
+
 export async function getProducts(first = 48): Promise<ShopifyProduct[]> {
   const query = `
     query Products($first: Int!) {
@@ -48,6 +70,36 @@ export async function getProducts(first = 48): Promise<ShopifyProduct[]> {
   `
   const data = await shopifyFetch(query, { first })
   return data?.data?.products?.edges?.map((e: { node: ShopifyProduct }) => e.node) ?? []
+}
+
+export async function getProductByHandle(handle: string): Promise<ShopifyProductDetail | null> {
+  const query = `
+    query ProductByHandle($handle: String!) {
+      product(handle: $handle) {
+        id
+        title
+        handle
+        description
+        descriptionHtml
+        productType
+        tags
+        priceRange { minVariantPrice { amount currencyCode } }
+        images(first: 10) { edges { node { url altText } } }
+        variants(first: 10) {
+          edges {
+            node {
+              id
+              title
+              availableForSale
+              price { amount currencyCode }
+            }
+          }
+        }
+      }
+    }
+  `
+  const data = await shopifyFetch(query, { handle })
+  return data?.data?.product ?? null
 }
 
 export async function createCart(variantId: string, quantity = 1) {
