@@ -43,7 +43,7 @@ export default function DiscogsImage({ listingId, title }: Props) {
           src={url}
           alt={title}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          loading="lazy"
+          loading="eager"
         />
       ) : (
         /* Vinyl placeholder */
