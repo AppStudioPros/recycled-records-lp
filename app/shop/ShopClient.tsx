@@ -280,6 +280,23 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
           />
         </div>
 
+        {/* Genre dropdown */}
+        {genres.length > 0 && (
+          <div style={{ position: 'relative' }}>
+            <select
+              value={genre}
+              onChange={e => handleGenreChange(e.target.value)}
+              style={selectStyle}
+              aria-label="Filter by genre"
+            >
+              <option value="All">All Genres</option>
+              {genres.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Format dropdown */}
         <div style={{ position: 'relative' }}>
           <select
