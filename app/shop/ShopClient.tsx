@@ -177,7 +177,39 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     backgroundColor: '#e8e0d0',
   }
 
-  // ── Shopify product grid ──────────────────────────────────────────────────────
+  // ── Shopify state ─────────────────────────────────────────────────────────────
+  const [sfSearch, setSfSearch] = useState('')
+  const [sfGenre, setSfGenre] = useState('All')
+  const [sfFormat, setSfFormat] = useState('All')
+  const [sfPerPage, setSfPerPage] = useState(50)
+  const [sfPage, setSfPage] = useState(1)
+
+  // Derived Shopify filter options from product tags + productType
+  const sfGenres = React.useMemo(() => {
+    const all = shopifyProducts.flatMap(p => p.tags)
+    return ['All', ...[...new Set(all)].filter(Boolean).sort()]
+  }, [shopifyProducts])
+
+  const sfFormats = React.useMemo(() => {
+    const all = shopifyProducts.map(p => p.productType).filter(Boolean)
+    return ['All', ...[...new Set(all)].sort()]
+  }, [shopifyProducts])
+
+  // Filtered + paginated Shopify products
+  const sfFiltered = React.useMemo(() => {
+    let results = shopifyProducts
+    if (sfSearch.trim()) {
+      const q = sfSearch.toLowerCase()
+      results = results.filter(p => p.title.toLowerCase().includes(q))
+    }
+    if (sfGenre !== 'All') results = results.filter(p => p.tags.includes(sfGenre))
+    if (sfFormat !== 'All') results = results.filter(p => p.productType === sfFormat)
+    return results
+  }, [shopifyProducts, sfSearch, sfGenre, sfFormat])
+
+  const sfTotalPages = Math.max(1, Math.ceil(sfFiltered.length / sfPerPage))
+  const sfPageItems = sfFiltered.slice((sfPage - 1) * sfPerPage, sfPage * sfPerPage)
+
   async function handleBuy(variantId: string) {
     try {
       const res = await fetch('/api/cart', {
@@ -190,26 +222,70 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
     } catch { /* silent */ }
   }
 
+  const tabBar = (active: 'discogs' | 'shopify') => (
+    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
+      <button onClick={() => setShopTab('discogs')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: active === 'discogs' ? 'none' : '1.5px solid rgba(26,16,8,0.25)', backgroundColor: active === 'discogs' ? '#C4522A' : 'transparent', color: active === 'discogs' ? '#FAF7F0' : '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Discogs</button>
+      <button onClick={() => setShopTab('shopify')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: active === 'shopify' ? 'none' : '1.5px solid rgba(26,16,8,0.25)', backgroundColor: active === 'shopify' ? '#C4522A' : 'transparent', color: active === 'shopify' ? '#FAF7F0' : '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Shopify</button>
+    </div>
+  )
+
   if (shopTab === 'shopify') {
     return (
       <div>
-        {/* Tab switcher */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-          <button onClick={() => setShopTab('discogs')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: '1.5px solid rgba(26,16,8,0.25)', backgroundColor: 'transparent', color: '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Discogs</button>
-          <button style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: 'none', backgroundColor: '#C4522A', color: '#FAF7F0', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Shopify</button>
+        {tabBar('shopify')}
+
+        {/* Filter bar — mirrors Discogs */}
+        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Search */}
+          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
+            <svg style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4, flexShrink: 0 }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+            <input
+              type="search"
+              placeholder="Search titles..."
+              value={sfSearch}
+              onChange={e => { setSfSearch(e.target.value); setSfPage(1) }}
+              style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2rem', border: '1.5px solid rgba(26,16,8,0.25)', borderRadius: '6px', backgroundColor: '#FAF7F0', color: '#1a1008', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          {/* Genre */}
+          {sfGenres.length > 1 && (
+            <div style={{ position: 'relative' }}>
+              <select value={sfGenre} onChange={e => { setSfGenre(e.target.value); setSfPage(1) }} style={selectStyle} aria-label="Filter by genre">
+                {sfGenres.map(g => <option key={g} value={g}>{g === 'All' ? 'All Genres' : g}</option>)}
+              </select>
+            </div>
+          )}
+          {/* Format */}
+          {sfFormats.length > 1 && (
+            <div style={{ position: 'relative' }}>
+              <select value={sfFormat} onChange={e => { setSfFormat(e.target.value); setSfPage(1) }} style={selectStyle} aria-label="Filter by format">
+                {sfFormats.map(f => <option key={f} value={f}>{f === 'All' ? 'All Formats' : f}</option>)}
+              </select>
+            </div>
+          )}
+          {/* Per page */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4a3828' }}>Per page:</label>
+            <select value={sfPerPage} onChange={e => { setSfPerPage(Number(e.target.value)); setSfPage(1) }} style={{ ...selectStyle, minWidth: '70px' }}>
+              {[25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <p style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#7a6555', whiteSpace: 'nowrap' }}>{sfFiltered.length} results</p>
         </div>
-        {shopifyProducts.length === 0 ? (
-          <p style={{ color: '#4a3828', textAlign: 'center', padding: '3rem 0' }}>No Shopify products found.</p>
+
+        {/* Grid */}
+        {sfPageItems.length === 0 ? (
+          <p style={{ color: '#4a3828', textAlign: 'center', padding: '3rem 0' }}>No products found.</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem' }}>
-            {shopifyProducts.map(product => {
+            {sfPageItems.map(product => {
               const image = product.images.edges[0]?.node
               const price = parseFloat(product.priceRange.minVariantPrice.amount).toFixed(2)
               const variant = product.variants.edges[0]?.node
               return (
                 <div key={product.id} style={{ border: '1.5px solid rgba(26,16,8,0.12)', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', display: 'flex', flexDirection: 'column' }}>
                   {image ? (
-                    <img src={image.url} alt={image.altText ?? product.title} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />
+                    <img src={image.url} alt={image.altText ?? product.title} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} loading="eager" />
                   ) : (
                     <div style={{ width: '100%', aspectRatio: '1', backgroundColor: '#e8e0d4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '0.8rem' }}>No image</div>
                   )}
@@ -227,17 +303,25 @@ export default function ShopClient({ initialListings, total, genres, formats, sh
             })}
           </div>
         )}
+
+        {/* Pagination */}
+        {sfTotalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', marginTop: '2rem', flexWrap: 'wrap' }}>
+            <button onClick={() => setSfPage(p => Math.max(1, p - 1))} disabled={sfPage === 1} style={pageBtnStyle(false, sfPage === 1)}>‹</button>
+            {getPageNumbers(sfPage, sfTotalPages).map((p, i) =>
+              p === '...' ? <span key={`e${i}`} style={{ alignSelf: 'center', padding: '0 4px', color: '#888' }}>…</span>
+              : <button key={p} onClick={() => setSfPage(p as number)} style={pageBtnStyle(sfPage === p, false)}>{p}</button>
+            )}
+            <button onClick={() => setSfPage(p => Math.min(sfTotalPages, p + 1))} disabled={sfPage === sfTotalPages} style={pageBtnStyle(false, sfPage === sfTotalPages)}>›</button>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
     <div>
-      {/* ── Tab switcher ────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
-        <button style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: 'none', backgroundColor: '#C4522A', color: '#FAF7F0', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Discogs</button>
-        <button onClick={() => setShopTab('shopify')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: '1.5px solid rgba(26,16,8,0.25)', backgroundColor: 'transparent', color: '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Shopify</button>
-      </div>
+      {tabBar('discogs')}
       {/* ── Filter bar ─────────────────────────────────────────────────── */}
       <div
         style={{
