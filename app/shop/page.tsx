@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import type { RRListing } from '@/lib/types/rr-inventory'
+import { getProducts, type ShopifyProduct } from '@/lib/shopify'
 import ShopClient from './ShopClient'
 
 export const metadata: Metadata = {
@@ -98,6 +99,7 @@ async function getShopData(): Promise<{
 
 export default async function ShopPage() {
   const { listings, total, genres, formats } = await getShopData()
+  const shopifyProducts: ShopifyProduct[] = await getProducts(96).catch(() => [])
 
   const isEmpty = listings.length === 0 && total === 0
 
@@ -130,6 +132,7 @@ export default async function ShopPage() {
             total={total}
             genres={genres}
             formats={formats}
+            shopifyProducts={shopifyProducts}
           />
         )}
       </div>

@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import type { RRListing } from '@/lib/types/rr-inventory'
+import type { ShopifyProduct } from '@/lib/shopify'
 import DiscogsImage from '@/components/DiscogsImage'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -76,9 +77,11 @@ interface Props {
   total: number
   genres: string[]
   formats: string[]
+  shopifyProducts?: ShopifyProduct[]
 }
 
-export default function ShopClient({ initialListings, total, genres, formats }: Props) {
+export default function ShopClient({ initialListings, total, genres, formats, shopifyProducts = [] }: Props) {
+  const [shopTab, setShopTab] = useState<'discogs' | 'shopify'>('discogs')
   const [search, setSearch] = useState('')
   const [genre, setGenre] = useState('All')
   const [format, setFormat] = useState('All')
@@ -174,8 +177,67 @@ export default function ShopClient({ initialListings, total, genres, formats }: 
     backgroundColor: '#e8e0d0',
   }
 
+  // ── Shopify product grid ──────────────────────────────────────────────────────
+  async function handleBuy(variantId: string) {
+    try {
+      const res = await fetch('/api/cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variantId }),
+      })
+      const data = await res.json()
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl
+    } catch { /* silent */ }
+  }
+
+  if (shopTab === 'shopify') {
+    return (
+      <div>
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
+          <button onClick={() => setShopTab('discogs')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: '1.5px solid rgba(26,16,8,0.25)', backgroundColor: 'transparent', color: '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Discogs</button>
+          <button style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: 'none', backgroundColor: '#C4522A', color: '#FAF7F0', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Shopify</button>
+        </div>
+        {shopifyProducts.length === 0 ? (
+          <p style={{ color: '#4a3828', textAlign: 'center', padding: '3rem 0' }}>No Shopify products found.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1.25rem' }}>
+            {shopifyProducts.map(product => {
+              const image = product.images.edges[0]?.node
+              const price = parseFloat(product.priceRange.minVariantPrice.amount).toFixed(2)
+              const variant = product.variants.edges[0]?.node
+              return (
+                <div key={product.id} style={{ border: '1.5px solid rgba(26,16,8,0.12)', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', display: 'flex', flexDirection: 'column' }}>
+                  {image ? (
+                    <img src={image.url} alt={image.altText ?? product.title} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', aspectRatio: '1', backgroundColor: '#e8e0d4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: '0.8rem' }}>No image</div>
+                  )}
+                  <div style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <p style={{ fontWeight: 700, color: '#1a1008', fontSize: '0.9rem', marginBottom: '0.25rem', lineHeight: 1.35 }}>{product.title}</p>
+                    <p style={{ color: '#C4522A', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.75rem' }}>${price}</p>
+                    {variant?.availableForSale ? (
+                      <button onClick={() => handleBuy(variant.id)} style={{ marginTop: 'auto', padding: '0.5rem', backgroundColor: '#1a1008', color: '#FAF7F0', border: 'none', borderRadius: '4px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>Buy Now</button>
+                    ) : (
+                      <span style={{ marginTop: 'auto', textAlign: 'center', fontSize: '0.8rem', color: '#888', fontWeight: 600 }}>Sold Out</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div>
+      {/* ── Tab switcher ────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
+        <button style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: 'none', backgroundColor: '#C4522A', color: '#FAF7F0', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Discogs</button>
+        <button onClick={() => setShopTab('shopify')} style={{ padding: '0.5rem 1.25rem', borderRadius: '4px', border: '1.5px solid rgba(26,16,8,0.25)', backgroundColor: 'transparent', color: '#1a1008', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>Shopify</button>
+      </div>
       {/* ── Filter bar ─────────────────────────────────────────────────── */}
       <div
         style={{
