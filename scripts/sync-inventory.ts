@@ -75,15 +75,15 @@ async function main() {
   log('Loading existing Supabase inventory...')
   const { data: existing, error: existingErr } = await sb
     .from('rr_inventory')
-    .select('listing_id, release_id, genres')
+    .select('listing_id, release_id, genres, price, condition, sleeve_condition, notes')
 
   if (existingErr) {
     log(`ERROR loading existing: ${existingErr.message}`)
     process.exit(1)
   }
 
-  const existingMap = new Map<number, { release_id: number; genres: string[] }>(
-    (existing ?? []).map((r: any) => [r.listing_id, { release_id: r.release_id, genres: r.genres ?? [] }])
+  const existingMap = new Map<number, { release_id: number; genres: string[]; price: number | null; condition: string | null; sleeve_condition: string | null; notes: string | null }>(
+    (existing ?? []).map((r: any) => [r.listing_id, { release_id: r.release_id, genres: r.genres ?? [], price: r.price ?? null, condition: r.condition ?? null, sleeve_condition: r.sleeve_condition ?? null, notes: r.notes ?? null }])
   )
   log(`Existing in Supabase: ${existingMap.size}`)
 
@@ -149,14 +149,30 @@ async function main() {
     }
   })
 
-  // ── 5. Upsert in batches of 100 ───────────────────────────────────────────
-  log(`Upserting ${rows.length} rows to Supabase...`)
+  // ── 5. Diff — only write rows that changed ────────────────────────────────
+  const changedRows = rows.filter(r => {
+    const ex = existingMap.get(r.listing_id)
+    if (!ex) return true // new listing — always write
+    // compare fields that change on Discogs
+    return (
+      r.price !== ex.price ||
+      r.condition !== ex.condition ||
+      r.sleeve_condition !== ex.sleeve_condition ||
+      r.notes !== ex.notes
+    )
+  })
+
+  const unchangedCount = rows.length - changedRows.length
+  log(`Rows unchanged (skipping): ${unchangedCount}`)
+  log(`Rows to write (new + changed): ${changedRows.length}`)
+
+  // ── 6. Upsert only changed rows ───────────────────────────────────────────
   let addedCount = 0
   let updatedCount = 0
   let errorCount = 0
 
-  for (let i = 0; i < rows.length; i += 100) {
-    const batch = rows.slice(i, i + 100)
+  for (let i = 0; i < changedRows.length; i += 100) {
+    const batch = changedRows.slice(i, i + 100)
     const { error: upsertErr } = await sb.from('rr_inventory').upsert(batch, {
       onConflict: 'listing_id',
     })
@@ -168,11 +184,11 @@ async function main() {
         if (existingMap.has(r.listing_id)) updatedCount++
         else addedCount++
       })
-      log(`  Upserted batch ${i + 1}-${i + batch.length}`)
+      if (batch.length > 0) log(`  Upserted batch ${i + 1}-${i + batch.length}`)
     }
   }
 
-  // ── 6. Delete stale listings ──────────────────────────────────────────────
+  // ── 7. Delete stale listings ──────────────────────────────────────────────
   const discogsIds = new Set(allListings.map(l => l.id))
   const staleIds = [...existingMap.keys()].filter(id => !discogsIds.has(id))
 
@@ -190,7 +206,7 @@ async function main() {
     }
   }
 
-  // ── 7. Final report ───────────────────────────────────────────────────────
+  // ── 8. Final report ───────────────────────────────────────────────────────
   const { count: finalCount } = await sb
     .from('rr_inventory')
     .select('*', { count: 'exact', head: true })
