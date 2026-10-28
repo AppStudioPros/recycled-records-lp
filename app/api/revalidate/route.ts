@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
 
   try {
     revalidateTag('inventory')
-    revalidatePath('/shop', 'page')
     return NextResponse.json({ revalidated: true, timestamp: new Date().toISOString() })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
