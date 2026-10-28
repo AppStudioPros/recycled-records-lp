@@ -102,7 +102,7 @@ export default async function ListingPage(
             'User-Agent': 'RecycledRecordsLP/1.0 +https://recycledrecordslps.com',
             Authorization: `Discogs key=${process.env.DISCOGS_CONSUMER_KEY}, secret=${process.env.DISCOGS_CONSUMER_SECRET}`,
           },
-          next: { revalidate: 3600 },
+          next: { revalidate: 60 },
         }
       )
       if (res.ok) release = await res.json()

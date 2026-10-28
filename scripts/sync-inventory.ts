@@ -53,6 +53,8 @@ async function main() {
   let page = 1
   let totalPages = 1
 
+    let fullSyncComplete = true // tracks whether ALL pages were fetched successfully
+
   do {
     log(`Fetching Discogs inventory page ${page}/${totalPages}...`)
     try {
@@ -62,14 +64,17 @@ async function main() {
       totalPages = data.pagination?.pages ?? 1
       log(`  Got ${listings.length} listings (total so far: ${allListings.length})`)
     } catch (e) {
-      log(`  ERROR: ${e}`)
+      log(`  ERROR on page ${page}: ${e}`)
+      log(`  ⚠️  Partial fetch — skipping stale deletion to protect inventory`)
+      fullSyncComplete = false
       break
     }
     page++
     if (page <= totalPages) await sleep(1100) // ~54 req/min — under Discogs 60/min limit
   } while (page <= totalPages)
 
-  log(`Total Discogs listings fetched: ${allListings.length}`)
+  log(`Total Discogs listings fetched: ${allListings.length}${fullSyncComplete ? '' : ' (INCOMPLETE)'}`)
+  if (!fullSyncComplete) log(`Proceeding with upsert only — stale deletion SKIPPED for safety`)
 
   // ── 2. Load existing Supabase rows ────────────────────────────────────────
   log('Loading existing Supabase inventory...')
@@ -188,22 +193,27 @@ async function main() {
     }
   }
 
-  // ── 7. Delete stale listings ──────────────────────────────────────────────
-  const discogsIds = new Set(allListings.map(l => l.id))
-  const staleIds = [...existingMap.keys()].filter(id => !discogsIds.has(id))
-
-  log(`Stale listings to remove: ${staleIds.length}`)
+  // ── 7. Delete stale listings (ONLY if full sync completed) ──────────────
   let removedCount = 0
 
-  for (let i = 0; i < staleIds.length; i += 100) {
-    const batch = staleIds.slice(i, i + 100)
-    const { error: delErr } = await sb.from('rr_inventory').delete().in('listing_id', batch)
-    if (!delErr) {
-      removedCount += batch.length
-      log(`  Deleted ${batch.length} stale listings`)
-    } else {
-      log(`  Delete error: ${delErr.message}`)
+  if (fullSyncComplete) {
+    const discogsIds = new Set(allListings.map(l => l.id))
+    const staleIds = [...existingMap.keys()].filter(id => !discogsIds.has(id))
+
+    log(`Stale listings to remove: ${staleIds.length}`)
+
+    for (let i = 0; i < staleIds.length; i += 100) {
+      const batch = staleIds.slice(i, i + 100)
+      const { error: delErr } = await sb.from('rr_inventory').delete().in('listing_id', batch)
+      if (!delErr) {
+        removedCount += batch.length
+        log(`  Deleted ${batch.length} stale listings`)
+      } else {
+        log(`  Delete error: ${delErr.message}`)
+      }
     }
+  } else {
+    log(`Stale deletion SKIPPED — incomplete sync, inventory protected`)
   }
 
   // ── 8. Final report ───────────────────────────────────────────────────────

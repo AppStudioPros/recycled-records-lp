@@ -31,10 +31,10 @@ async function getShopData(): Promise<{
   try {
     const [listingsRes, metaRes] = await Promise.all([
       fetch(`${baseUrl}/api/shop/listings?per_page=50&page=1`, {
-        next: { revalidate: 60 },
+        next: { revalidate: 60, tags: ['inventory'] },
       }),
       fetch(`${baseUrl}/api/shop/listings/meta`, {
-        next: { revalidate: 300 },
+        next: { revalidate: 300, tags: ['inventory'] },
       }),
     ])
 
