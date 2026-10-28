@@ -226,7 +226,7 @@ async function main() {
   log(`Sync complete!`)
   log(`  Added:   ${addedCount}`)
   log(`  Updated: ${updatedCount}`)
-  log(`  Removed: ${staleIds.length} → actually deleted: ${removedCount}`)
+  log(`  Removed: ${removedCount}`)
   log(`  Errors:  ${errorCount}`)
   log(`  Total in Supabase: ${finalCount ?? '?'}`)
   log('═══════════════════════════════════════')
