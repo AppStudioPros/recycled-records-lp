@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { store } from '@/lib/store'
 import { Phone, Mail, MapPin, Clock } from 'lucide-react'
 import Header from '@/components/Header'
+import Image from 'next/image'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
@@ -38,25 +39,26 @@ export default function ContactPage() {
     <main>
       <Header />
 
-      {/* Hero */}
-      <section className="hero" style={{ minHeight: '340px' }}>
-        <div className="hero-copy" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <p className="eyebrow hero-eyebrow">Get in touch</p>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(3rem, 6vw, 5.5rem)', fontWeight: 800, lineHeight: 0.95, letterSpacing: '-0.05em' }}>
-            We'd love to<br />hear from you.
-          </h1>
-          <p className="hero-description" style={{ marginTop: '1.25rem', maxWidth: '440px' }}>
-            Questions about records, equipment, buying or selling? We're here Tuesday through Sunday.
-          </p>
-        </div>
-        <div className="hero-visual" style={{ background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center', padding: '2rem' }}>
-            <a href={store.phoneHref} style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 800, color: 'var(--cream)', letterSpacing: '-0.04em', lineHeight: 1.1, display: 'block', marginBottom: '0.5rem' }}>
-              {store.phone}
-            </a>
-            <p style={{ color: '#958f84', fontSize: '0.8rem', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Call the shop</p>
-          </div>
-        </div>
+      {/* Hero image — full width */}
+      <section style={{ position: 'relative', width: '100%', aspectRatio: '16/6', overflow: 'hidden', minHeight: '300px' }}>
+        <Image
+          src="/images/store/contact-hero.png"
+          alt="Drop the Needle. Swing By. — Recycled Records LP, Boulder CO"
+          fill
+          priority
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
+        />
+      </section>
+
+      {/* Intro — single column above form */}
+      <section style={{ padding: '3rem 4% 0' }}>
+        <p className="eyebrow" style={{ marginBottom: '0.75rem' }}>Get in touch</p>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)', fontWeight: 800, lineHeight: 1.05, letterSpacing: '-0.04em', marginBottom: '0.75rem' }}>
+          We'd love to hear from you.
+        </h1>
+        <p style={{ fontSize: '1rem', color: '#4a3828', maxWidth: '560px', lineHeight: 1.75 }}>
+          Questions about records, equipment, buying or selling? Drop us a note or give us a call — we're here Tuesday through Sunday.
+        </p>
       </section>
 
       {/* Form + Info */}
