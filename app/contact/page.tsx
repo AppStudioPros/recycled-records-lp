@@ -23,46 +23,54 @@ export default function ContactPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    background: '#fff',
-    border: '1px solid var(--line)',
-    borderRadius: '0',
+    background: 'var(--cream)',
+    border: '1px solid var(--ink)',
     color: 'var(--ink)',
     padding: '0.75rem 1rem',
     fontSize: '0.95rem',
+    fontFamily: 'var(--body)',
     outline: 'none',
     boxSizing: 'border-box',
-    fontFamily: 'var(--body)',
   }
 
   return (
     <main>
-      {/* Page header */}
-      <section style={{ padding: '52px 4% 44px', borderBottom: '1px solid var(--ink)' }}>
-        <p className="eyebrow" style={{ marginBottom: '1rem' }}>
-          <span className="eyebrow-line" style={{ display: 'inline-block', width: '28px', height: '2px', background: 'var(--orange)', marginRight: '12px', verticalAlign: 'middle' }} />
-          Get in touch
-        </p>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2.6rem, 5vw, 4rem)', fontWeight: 800, lineHeight: 1.0, letterSpacing: '-0.05em' }}>
-          We'd love to<br />hear from you.
-        </h1>
-        <p style={{ marginTop: '1.25rem', fontSize: '1.05rem', color: '#4a3828', maxWidth: '520px', lineHeight: 1.7 }}>
-          Questions about records, equipment, buying or selling? Drop us a note below or give us a call — we're here Tuesday through Sunday.
-        </p>
+
+      {/* Hero */}
+      <section className="hero" style={{ minHeight: '340px' }}>
+        <div className="hero-copy" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <p className="eyebrow hero-eyebrow">Get in touch</p>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(3rem, 6vw, 5.5rem)', fontWeight: 800, lineHeight: 0.95, letterSpacing: '-0.05em' }}>
+            We'd love to<br />hear from you.
+          </h1>
+          <p className="hero-description" style={{ marginTop: '1.25rem', maxWidth: '440px' }}>
+            Questions about records, equipment, buying or selling? We're here Tuesday through Sunday.
+          </p>
+        </div>
+        <div className="hero-visual" style={{ background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <a href={store.phoneHref} style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 800, color: 'var(--cream)', letterSpacing: '-0.04em', lineHeight: 1.1, display: 'block', marginBottom: '0.5rem' }}>
+              {store.phone}
+            </a>
+            <p style={{ color: '#958f84', fontSize: '0.8rem', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Call the shop</p>
+          </div>
+        </div>
       </section>
 
-      {/* Two-column content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--ink)' }}>
+      {/* Form + Info */}
+      <section className="section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5rem', alignItems: 'start' }}>
 
-        {/* Left — form */}
-        <div style={{ padding: '48px 4%', borderRight: '1px solid var(--ink)' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '1.75rem' }}>
-            Send us a message
+        {/* Contact form */}
+        <div>
+          <p className="eyebrow" style={{ marginBottom: '1.25rem' }}>Send a message</p>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: '2rem' }}>
+            Drop us a note.
           </h2>
 
           {status === 'sent' ? (
-            <div style={{ padding: '2.5rem', border: '1px solid var(--line)', textAlign: 'center', background: '#fff' }}>
+            <div style={{ padding: '2rem', border: '1px solid var(--ink)', textAlign: 'center', background: '#fff' }}>
               <p style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', marginBottom: '0.4rem' }}>Message sent!</p>
-              <p style={{ color: '#5e594f', fontSize: '0.9rem' }}>We'll get back to you soon.</p>
+              <p style={{ color: '#5e594f', fontSize: '0.9rem' }}>We'll be in touch soon.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -80,7 +88,7 @@ export default function ContactPage() {
               </div>
               {status === 'error' && <p style={{ color: 'var(--orange)', fontSize: '0.85rem' }}>Something went wrong — try calling us at {store.phone}.</p>}
               <div>
-                <button type="submit" disabled={status === 'sending'} className="button" style={{ opacity: status === 'sending' ? 0.6 : 1, cursor: status === 'sending' ? 'default' : 'pointer' }}>
+                <button type="submit" disabled={status === 'sending'} className="button" style={{ opacity: status === 'sending' ? 0.6 : 1 }}>
                   {status === 'sending' ? 'Sending…' : 'Send Message'}
                 </button>
               </div>
@@ -88,49 +96,47 @@ export default function ContactPage() {
           )}
         </div>
 
-        {/* Right — store info */}
-        <div style={{ padding: '48px 4%' }}>
-          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '1.75rem' }}>
-            Find us
+        {/* Store info */}
+        <div>
+          <p className="eyebrow" style={{ marginBottom: '1.25rem' }}>Find us</p>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: '2rem' }}>
+            Come dig in Boulder.
           </h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <Phone size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
+              <Phone size={16} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.3rem' }}>Phone</p>
-                <a href={store.phoneHref} style={{ fontSize: '1.1rem', fontWeight: 500 }}>{store.phone}</a>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.25rem' }}>Phone</p>
+                <a href={store.phoneHref} className="text-link" style={{ fontSize: '1rem' }}>{store.phone}</a>
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <Mail size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
+              <Mail size={16} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.3rem' }}>Email</p>
-                <a href={store.emailHref} style={{ fontSize: '1rem' }}>{store.email}</a>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.25rem' }}>Email</p>
+                <a href={store.emailHref} className="text-link" style={{ fontSize: '1rem' }}>{store.email}</a>
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <MapPin size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
+              <MapPin size={16} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.3rem' }}>Location</p>
-                <a href={store.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '1rem', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.25rem' }}>Location</p>
+                <a href={store.mapsUrl} target="_blank" rel="noopener noreferrer" className="text-link" style={{ fontSize: '1rem', lineHeight: 1.7 }}>
                   {store.address}<br />{store.locality}
                 </a>
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <Clock size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
-              <div>
+              <Clock size={16} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
+              <div style={{ width: '100%' }}>
                 <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.75rem' }}>Hours</p>
-                <div className="hours" style={{ border: '1px solid var(--ink)', padding: '1.5rem 1.75rem' }}>
+                <div className="hours" style={{ border: '1px solid var(--ink)', padding: '1.25rem 1.5rem' }}>
                   <dl style={{ margin: 0 }}>
                     {store.hours.map(([day, time]) => (
-                      <div key={day} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', padding: '10px 0', borderBottom: '1px solid var(--line)', fontSize: '0.9rem' }}>
+                      <div key={day} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', padding: '10px 0', borderBottom: '1px solid var(--line)', fontSize: '0.88rem' }}>
                         <dt style={{ color: '#5e594f' }}>{day}</dt>
-                        <dd style={{ margin: 0, whiteSpace: 'nowrap', fontWeight: time === 'Closed' ? 400 : 500, color: time === 'Closed' ? '#aaa' : 'var(--ink)' }}>{time}</dd>
+                        <dd style={{ margin: 0, whiteSpace: 'nowrap', color: time === 'Closed' ? '#aaa' : 'var(--ink)' }}>{time}</dd>
                       </div>
                     ))}
                   </dl>
@@ -139,7 +145,7 @@ export default function ContactPage() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </main>
   )
 }
