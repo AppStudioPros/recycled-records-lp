@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { store } from '@/lib/store'
 import { Phone, Mail, MapPin, Clock } from 'lucide-react'
+import Header from '@/components/Header'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
@@ -35,6 +36,7 @@ export default function ContactPage() {
 
   return (
     <main>
+      <Header />
 
       {/* Hero */}
       <section className="hero" style={{ minHeight: '340px' }}>
