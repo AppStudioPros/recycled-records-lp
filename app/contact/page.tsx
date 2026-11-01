@@ -21,106 +21,120 @@ export default function ContactPage() {
     } catch { setStatus('error') }
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: '#fff',
+    border: '1px solid var(--line)',
+    borderRadius: '0',
+    color: 'var(--ink)',
+    padding: '0.75rem 1rem',
+    fontSize: '0.95rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'var(--body)',
+  }
+
   return (
-    <main style={{ backgroundColor: 'var(--ink)', minHeight: '100vh', color: 'var(--cream)', padding: '5rem 1.5rem' }}>
-      <div style={{ maxWidth: '1040px', margin: '0 auto' }}>
+    <main>
+      {/* Page header */}
+      <section style={{ padding: '52px 4% 44px', borderBottom: '1px solid var(--ink)' }}>
+        <p className="eyebrow" style={{ marginBottom: '1rem' }}>
+          <span className="eyebrow-line" style={{ display: 'inline-block', width: '28px', height: '2px', background: 'var(--orange)', marginRight: '12px', verticalAlign: 'middle' }} />
+          Get in touch
+        </p>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2.6rem, 5vw, 4rem)', fontWeight: 800, lineHeight: 1.0, letterSpacing: '-0.05em' }}>
+          We'd love to<br />hear from you.
+        </h1>
+        <p style={{ marginTop: '1.25rem', fontSize: '1.05rem', color: '#4a3828', maxWidth: '520px', lineHeight: 1.7 }}>
+          Questions about records, equipment, buying or selling? Drop us a note below or give us a call — we're here Tuesday through Sunday.
+        </p>
+      </section>
 
-        {/* Header */}
-        <div style={{ marginBottom: '3.5rem' }}>
-          <p className="eyebrow" style={{ marginBottom: '1rem' }}>
-            <span className="eyebrow-line" />
-            Get in touch
-          </p>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: 400, lineHeight: 1.1, marginBottom: '1rem' }}>
-            We'd love to<br />hear from you.
-          </h1>
-          <p style={{ color: 'var(--cream-muted)', maxWidth: '480px', lineHeight: 1.75 }}>
-            Questions about records, equipment, buying or selling? Drop us a note or give us a call. We're here Tuesday through Sunday.
-          </p>
-        </div>
+      {/* Two-column content */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--ink)' }}>
 
-        {/* Two-column layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'start' }}>
+        {/* Left — form */}
+        <div style={{ padding: '48px 4%', borderRight: '1px solid var(--ink)' }}>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '1.75rem' }}>
+            Send us a message
+          </h2>
 
-          {/* Left: form */}
-          <div>
-            {status === 'sent' ? (
-              <div style={{ padding: '2.5rem', border: '1px solid rgba(242,235,221,0.15)', textAlign: 'center' }}>
-                <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', marginBottom: '0.5rem' }}>Message sent!</p>
-                <p style={{ color: 'var(--cream-muted)', fontSize: '0.9rem' }}>We'll get back to you soon.</p>
+          {status === 'sent' ? (
+            <div style={{ padding: '2.5rem', border: '1px solid var(--line)', textAlign: 'center', background: '#fff' }}>
+              <p style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', marginBottom: '0.4rem' }}>Message sent!</p>
+              <p style={{ color: '#5e594f', fontSize: '0.9rem' }}>We'll get back to you soon.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.4rem' }}>Name</label>
+                <input type="text" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.4rem' }}>Name</label>
-                  <input
-                    type="text" required value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(242,235,221,0.06)', border: '1px solid rgba(242,235,221,0.18)', color: 'var(--cream)', padding: '0.75rem 1rem', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.4rem' }}>Email</label>
-                  <input
-                    type="email" required value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(242,235,221,0.06)', border: '1px solid rgba(242,235,221,0.18)', color: 'var(--cream)', padding: '0.75rem 1rem', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.4rem' }}>Message</label>
-                  <textarea
-                    required rows={5} value={form.message}
-                    onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(242,235,221,0.06)', border: '1px solid rgba(242,235,221,0.18)', color: 'var(--cream)', padding: '0.75rem 1rem', fontSize: '0.95rem', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                </div>
-                {status === 'error' && <p style={{ color: '#e57373', fontSize: '0.85rem' }}>Something went wrong. Try calling us directly.</p>}
-                <button type="submit" disabled={status === 'sending'}
-                  style={{ alignSelf: 'flex-start', background: 'var(--gold)', color: 'var(--ink)', border: 'none', padding: '0.8rem 2rem', fontSize: '0.78rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer', opacity: status === 'sending' ? 0.6 : 1 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.4rem' }}>Email</label>
+                <input type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.4rem' }}>Message</label>
+                <textarea required rows={5} value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} />
+              </div>
+              {status === 'error' && <p style={{ color: 'var(--orange)', fontSize: '0.85rem' }}>Something went wrong — try calling us at {store.phone}.</p>}
+              <div>
+                <button type="submit" disabled={status === 'sending'} className="button" style={{ opacity: status === 'sending' ? 0.6 : 1, cursor: status === 'sending' ? 'default' : 'pointer' }}>
                   {status === 'sending' ? 'Sending…' : 'Send Message'}
                 </button>
-              </form>
-            )}
-          </div>
+              </div>
+            </form>
+          )}
+        </div>
 
-          {/* Right: store info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        {/* Right — store info */}
+        <div style={{ padding: '48px 4%' }}>
+          <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '1.75rem' }}>
+            Find us
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <Phone size={18} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '2px' }} />
+              <Phone size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.25rem' }}>Phone</p>
-                <a href={store.phoneHref} style={{ color: 'var(--cream)', fontSize: '1.1rem', textDecoration: 'none' }}>{store.phone}</a>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.3rem' }}>Phone</p>
+                <a href={store.phoneHref} style={{ fontSize: '1.1rem', fontWeight: 500 }}>{store.phone}</a>
               </div>
             </div>
+
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <Mail size={18} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '2px' }} />
+              <Mail size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.25rem' }}>Email</p>
-                <a href={store.emailHref} style={{ color: 'var(--cream)', fontSize: '1rem', textDecoration: 'none' }}>{store.email}</a>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.3rem' }}>Email</p>
+                <a href={store.emailHref} style={{ fontSize: '1rem' }}>{store.email}</a>
               </div>
             </div>
+
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <MapPin size={18} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '2px' }} />
+              <MapPin size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.25rem' }}>Location</p>
-                <a href={store.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--cream)', fontSize: '1rem', textDecoration: 'none', lineHeight: 1.6 }}>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.3rem' }}>Location</p>
+                <a href={store.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '1rem', lineHeight: 1.6 }}>
                   {store.address}<br />{store.locality}
                 </a>
               </div>
             </div>
+
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-              <Clock size={18} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '2px' }} />
+              <Clock size={17} style={{ color: 'var(--orange)', flexShrink: 0, marginTop: '3px' }} />
               <div>
-                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginBottom: '0.5rem' }}>Hours</p>
-                <dl style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                  {store.hours.map(([day, time]) => (
-                    <div key={day} style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
-                      <dt style={{ color: 'var(--cream-muted)', minWidth: '150px' }}>{day}</dt>
-                      <dd style={{ color: 'var(--cream)' }}>{time}</dd>
-                    </div>
-                  ))}
-                </dl>
+                <p style={{ fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.75rem' }}>Hours</p>
+                <div className="hours" style={{ border: '1px solid var(--ink)', padding: '1.5rem 1.75rem' }}>
+                  <dl style={{ margin: 0 }}>
+                    {store.hours.map(([day, time]) => (
+                      <div key={day} style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', padding: '10px 0', borderBottom: '1px solid var(--line)', fontSize: '0.9rem' }}>
+                        <dt style={{ color: '#5e594f' }}>{day}</dt>
+                        <dd style={{ margin: 0, whiteSpace: 'nowrap', fontWeight: time === 'Closed' ? 400 : 500, color: time === 'Closed' ? '#aaa' : 'var(--ink)' }}>{time}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
               </div>
             </div>
           </div>
