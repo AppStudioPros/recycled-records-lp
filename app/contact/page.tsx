@@ -40,13 +40,14 @@ export default function ContactPage() {
       <Header />
 
       {/* Hero image — full width */}
-      <section style={{ position: 'relative', width: '100%', aspectRatio: '16/6', overflow: 'hidden', minHeight: '300px' }}>
+      <section style={{ width: '100%' }}>
         <Image
           src="/images/store/contact-hero.png"
           alt="Drop the Needle. Swing By. — Recycled Records LP, Boulder CO"
-          fill
+          width={2400}
+          height={1350}
           priority
-          style={{ objectFit: 'cover', objectPosition: 'center' }}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
         />
       </section>
 
