@@ -57,7 +57,7 @@ export default function Home() {
           <span className="photo-caption">There's always another discovery.</span>
         </div>
       </section>
-      <section className="audio section reveal" id="audio" aria-labelledby="audio-title"><div><p className="eyebrow">The equipment shelf</p><h2 id="audio-title">Put a little<br />warmth in your sound.</h2></div><div><p>Turntables, audio equipment, and the physical formats you love. Stop by to see what's in the shop, or call about what you're looking for.</p><a className="text-link" href="/#audio">Ask about current equipment</a></div></section>
+      <section className="audio section reveal" id="audio" aria-labelledby="audio-title"><div><p className="eyebrow">The equipment shelf</p><h2 id="audio-title">Put a little<br />warmth in your sound.</h2></div><div><p>Turntables, audio equipment, and the physical formats you love. Stop by to see what's in the shop, or call about what you're looking for.</p><a className="text-link" href="/contact">Ask about current equipment</a></div></section>
       <section className="section about-store reveal" id="about" aria-labelledby="about-title" style={{borderTop:'1px solid rgba(0,0,0,0.08)',padding:'4rem 2rem',maxWidth:'860px',margin:'0 auto'}}>
         <div className="about-grid" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'3rem',alignItems:'start'}}>
           <div>
