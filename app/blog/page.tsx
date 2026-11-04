@@ -67,11 +67,13 @@ export default async function BlogPage() {
                         />
                       </div>
                     ) : (
-                      <div
-                        className="w-full h-48 flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, #1a0a00 0%, #C4522A 100%)' }}
-                      >
-                        <span className="text-4xl">🎵</span>
+                      <div className="relative w-full h-48">
+                        <Image
+                          src="/images/blog-fallback.jpg"
+                          alt="Vinyl records"
+                          fill
+                          className="object-cover"
+                        />
                       </div>
                     )}
 
