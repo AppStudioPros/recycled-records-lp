@@ -8,6 +8,7 @@ const navLinks = [
   { label: 'Online Shop', href: shopTarget },
   { label: 'Turntables & Audio', href: '/#audio' },
   { label: 'Sell Your Collection', href: '/sell' },
+  { label: 'Blog', href: '/blog' },
   { label: 'Visit Us', href: '/#visit' },
 ]
 
