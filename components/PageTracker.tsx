@@ -41,9 +41,6 @@ export default function PageTracker() {
   const pathname = usePathname()
 
   useEffect(() => {
-    // Don't track admin routes
-    if (pathname?.startsWith('/admin')) return
-
     const referrer = document.referrer || 'direct'
     const payload = {
       page: window.location.pathname,

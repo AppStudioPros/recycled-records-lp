@@ -1,6 +1,6 @@
 /**
  * Shared Discogs → Supabase inventory sync logic.
- * Used by both the admin API route and the cron job.
+ * Used by the inventory sync cron job.
  */
 import { createAdminClient } from '@/lib/supabase/server'
 
